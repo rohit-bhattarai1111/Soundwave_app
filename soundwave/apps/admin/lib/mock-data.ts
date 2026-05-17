@@ -1,30 +1,22 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
-//
-// NOTE: This file duplicates the store's mock-data.ts for now.
-// On Day 4 we'll move shared types to the packages/ui workspace package
-// so both apps import from a single source of truth.
+// TODO iteration 2: move shared types to packages/ui so store and admin import
+// from a single source of truth instead of duplicating these definitions.
 
-// Genre union type — same four values as the store app.
 export type Genre = "Rock" | "Jazz" | "Hip-Hop" | "Electronic";
 
-// Product extends the store's Album concept with admin-only fields.
-// The store doesn't need to know about stock levels, but the admin dashboard does.
 export interface Product {
   id: string;
   title: string;
   artist: string;
   genre: Genre;
-  price: number;       // Raw number — formatted to 2 dp in the UI
-  stock: number;       // Units available for sale — admin-only concern
-  imageUrl: string;    // picsum.photos seed URL
+  price: number;
+  stock: number;
+  imageUrl: string;
   previewUrl: string;
 }
 
 // ─── Mock Products ─────────────────────────────────────────────────────────────
-//
-// Same 12 albums as the store, but with a `stock` field added.
-// When we connect a real database, this array is replaced by a fetch/query —
-// nothing else in the component files needs to change.
+// TODO iteration 2: replace with database query
 
 export const products: Product[] = [
   { id: "1",  title: "Neon Horizon",    artist: "The Static Kings",  genre: "Rock",       price: 9.99,  stock: 42, imageUrl: "https://picsum.photos/seed/1/400/400",  previewUrl: "/preview-placeholder.mp3" },
@@ -43,21 +35,20 @@ export const products: Product[] = [
 
 // ─── Types — Orders ────────────────────────────────────────────────────────────
 
-// A union type for the three possible order states.
-// Using a union means TypeScript will error if you use any other string.
 export type OrderStatus = "pending" | "completed" | "refunded";
 
 export interface Order {
   id: string;
-  customer: string;    // Customer's display name
-  email: string;       // Customer's email address
-  product: string;     // Album title purchased
-  amount: number;      // Total amount paid
+  customer: string;
+  email: string;
+  product: string;
+  amount: number;
   status: OrderStatus;
-  date: string;        // ISO 8601 date string — formatted in the UI
+  date: string;
 }
 
 // ─── Mock Orders ───────────────────────────────────────────────────────────────
+// TODO iteration 2: replace with database query
 
 export const orders: Order[] = [
   { id: "ORD-001", customer: "Priya Mehta",     email: "priya@example.com",   product: "Neon Horizon",    amount: 9.99,  status: "completed", date: "2026-05-14" },

@@ -1,15 +1,3 @@
-// ─── /register page ───────────────────────────────────────────────────────────
-//
-// Same controlled-input pattern as /login, extended to four fields.
-// Key addition: the "confirm password" field demonstrates cross-field validation
-// — checking one field's value against another — which isn't possible with
-// simple per-field rules.
-//
-// See /login for full explanations of:
-//   • Controlled inputs (value + onChange)
-//   • The onChange event
-//   • Client-side vs server-side validation
-
 "use client";
 
 import { useState } from "react";
@@ -18,7 +6,7 @@ import Link from "next/link";
 import { useUser } from "@/contexts/UserContext";
 
 // ─── Email regex ──────────────────────────────────────────────────────────────
-// Same loose pattern as the login page — basic structural check only.
+// Loose structural check — full RFC 5321 validation is not worth it client-side.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,11 +21,8 @@ interface RegisterErrors {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
-
   const router = useRouter();
   const { login } = useUser();
-
-  // ── State ──────────────────────────────────────────────────────────────────
 
   const [fields, setFields] = useState({
     name: "",
@@ -45,59 +30,37 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
-
   const [errors, setErrors] = useState<RegisterErrors>({});
 
-  // ── handleChange ───────────────────────────────────────────────────────────
-  //
-  // Identical pattern to the login page.
-  // `e.target.name` matches the `name` attribute on each input, which in turn
-  // matches a key in `fields`, so one function covers all four inputs.
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-
     setFields((prev) => ({ ...prev, [name]: value }));
-
-    // Clear this field's error as the user corrects it.
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   }
-
-  // ── handleSubmit ───────────────────────────────────────────────────────────
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    // Build up all validation errors before setting state so every error
-    // appears at once (not one after the next on repeated submits).
     const newErrors: RegisterErrors = {};
 
     if (fields.name.trim().length === 0) {
       newErrors.name = "Name is required.";
     }
-
     if (!EMAIL_REGEX.test(fields.email)) {
       newErrors.email = "Please enter a valid email address.";
     }
-
     if (fields.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters.";
     }
-
-    // Cross-field validation: compare two fields against each other.
-    // This kind of check is impossible with HTML's native `pattern` attribute
-    // (which only validates one field in isolation) — it's one of the main
-    // reasons we validate in JavaScript instead.
     if (fields.confirmPassword !== fields.password) {
       newErrors.confirmPassword = "Passwords do not match.";
     }
-
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // Mock registration: log the data, log the user in with their name,
-    // then redirect to the store home page.
+    // TODO iteration 2: replace with real API call
     console.log("Register submitted:", {
       name: fields.name,
       email: fields.email,
@@ -107,11 +70,6 @@ export default function RegisterPage() {
     router.push("/");
   }
 
-  // ── Shared input class builder ──────────────────────────────────────────────
-  //
-  // A small helper to avoid repeating the long className string four times.
-  // Returns the full className string for a given field, switching to red
-  // borders when that field has a validation error.
   function inputClass(field: keyof RegisterErrors): string {
     const hasError = Boolean(errors[field]);
     return [
@@ -123,14 +81,11 @@ export default function RegisterPage() {
     ].join(" ");
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
 
       <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
 
-        {/* ── Heading ──────────────────────────────────────────────────────── */}
         <div className="mb-8 text-center">
           <Link href="/" className="text-2xl font-bold text-indigo-600">
             Soundwave
@@ -141,10 +96,8 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* ── Form ─────────────────────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
 
-          {/* ── Name field ─────────────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="name" className="text-sm font-medium text-gray-700">
               Full name
@@ -164,7 +117,6 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* ── Email field ────────────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className="text-sm font-medium text-gray-700">
               Email address
@@ -184,7 +136,6 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* ── Password field ─────────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="password" className="text-sm font-medium text-gray-700">
               Password
@@ -199,21 +150,14 @@ export default function RegisterPage() {
               onChange={handleChange}
               className={inputClass("password")}
             />
-            {/* Hint text below the field (always shown, not an error) */}
             <p className="text-xs text-gray-400">Must be at least 6 characters.</p>
             {errors.password && (
               <p className="text-xs font-medium text-red-500">{errors.password}</p>
             )}
           </div>
 
-          {/* ── Confirm password field ─────────────────────────────────────── */}
-          {/* This field only exists to catch typos. Its value is never stored
-              or sent to a server — we just compare it to `fields.password`. */}
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="confirmPassword"
-              className="text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
               Confirm password
             </label>
             <input
@@ -233,7 +177,6 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* ── Submit button ──────────────────────────────────────────────── */}
           <button
             type="submit"
             className="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
@@ -243,13 +186,9 @@ export default function RegisterPage() {
 
         </form>
 
-        {/* ── Switch link ──────────────────────────────────────────────────── */}
         <p className="mt-6 text-center text-sm text-gray-500">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-semibold text-indigo-600 hover:text-indigo-700"
-          >
+          <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
             Log in
           </Link>
         </p>

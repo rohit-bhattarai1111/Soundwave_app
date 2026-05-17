@@ -1,21 +1,8 @@
-// ─── DeleteConfirmDialog.tsx ──────────────────────────────────────────────────
-//
-// A small confirmation dialog rendered before a destructive action.
-// Uses the exact same modal pattern as AddProductModal:
-//   • fixed inset-0 backdrop dims the page
-//   • dialog box sits on top via z-10
-//   • clicking the backdrop = clicking Cancel (same as pressing Escape on desktop)
-//
-// WHY ask for confirmation before delete?
-// Deletes are not reversible in the UI (no undo). In iteration 2 they'll be
-// permanent in the database too. A "are you sure?" step is a standard UX
-// convention that prevents accidental data loss from a mis-click.
-
 "use client";
 
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface DeleteConfirmDialogProps {
-  // The name of the product about to be deleted — shown in the warning message
-  // so the user knows exactly what they are confirming.
   productTitle: string;
   onCancel:  () => void;
   onConfirm: () => void;
@@ -29,20 +16,16 @@ export function DeleteConfirmDialog({
   onConfirm,
 }: DeleteConfirmDialogProps) {
   return (
-    // full-screen layer — same fixed inset-0 pattern as AddProductModal
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 
-      {/* Backdrop — clicking it cancels, same as pressing the Cancel button */}
       <div
         className="absolute inset-0 bg-black/50"
         onClick={onCancel}
         aria-hidden="true"
       />
 
-      {/* Dialog box */}
       <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
 
-        {/* Warning icon */}
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -61,16 +44,13 @@ export function DeleteConfirmDialog({
           </svg>
         </div>
 
-        {/* Heading */}
         <h2 className="text-lg font-bold text-slate-800">Delete product?</h2>
 
-        {/* Body — names the specific product so there's no ambiguity */}
         <p className="mt-2 text-sm text-slate-500">
           <span className="font-semibold text-slate-700">&ldquo;{productTitle}&rdquo;</span>{" "}
           will be permanently removed. This cannot be undone.
         </p>
 
-        {/* Action buttons — destructive action on the right (Delete), safe action on the left */}
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onCancel}

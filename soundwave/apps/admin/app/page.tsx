@@ -1,8 +1,3 @@
-// ─── Dashboard page (/) ───────────────────────────────────────────────────────
-//
-// The landing page for the admin — a quick-glance summary of the catalogue.
-// Server Component: reads mock data directly, no hooks needed.
-
 import Link from "next/link";
 import { products, orders } from "@/lib/mock-data";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -24,15 +19,12 @@ function getDashboardStats() {
 
 export default function DashboardPage() {
   const stats = getDashboardStats();
-
-  // The 5 most recently added products (last 5 in the array).
   const recentProducts = [...products].slice(-5).reverse();
 
   return (
     <ProtectedRoute>
     <div className="flex flex-col gap-8">
 
-      {/* ── Page heading ───────────────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
         <p className="mt-0.5 text-sm text-slate-500">
@@ -40,15 +32,13 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* ── Stat cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Products"          value={stats.totalProducts}           colour="text-slate-800"   />
-        <StatCard label="Total Orders"      value={stats.totalOrders}             colour="text-slate-800"   />
-        <StatCard label="Revenue"           value={`$${stats.revenue.toFixed(2)}`} colour="text-emerald-600" />
-        <StatCard label="Low / Out of Stock" value={stats.lowStock + stats.outOfStock} colour="text-red-500" />
+        <StatCard label="Products"           value={stats.totalProducts}            colour="text-slate-800"   />
+        <StatCard label="Total Orders"       value={stats.totalOrders}              colour="text-slate-800"   />
+        <StatCard label="Revenue"            value={`$${stats.revenue.toFixed(2)}`} colour="text-emerald-600" />
+        <StatCard label="Low / Out of Stock" value={stats.lowStock + stats.outOfStock} colour="text-red-500"  />
       </div>
 
-      {/* ── Quick-action links ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
 
         <Link
@@ -83,7 +73,6 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* ── Recent products ────────────────────────────────────────────────── */}
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800">Recent Products</h2>

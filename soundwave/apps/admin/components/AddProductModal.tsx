@@ -1,27 +1,3 @@
-// ─── AddProductModal.tsx ───────────────────────────────────────────────────────
-//
-// CONCEPT: Controlled vs Uncontrolled Modal
-//
-// In the first iteration this component owned its own open/close state — it was
-// "uncontrolled" from the parent's perspective (the parent just rendered it and
-// had no say in when it was open). That worked fine when there was only one use:
-// "Add Product".
-//
-// Now we have two uses: "Add" (empty form) and "Edit" (pre-filled form). The
-// PARENT (the products page) decides which product is being edited, so the parent
-// must control whether the modal is open. We model this the same way as HTML
-// controlled inputs: the parent passes `isOpen` as a prop, and calls `onClose`
-// when it wants the modal gone.
-//
-// This is the same principle as `value` + `onChange` on a controlled <input>.
-// The component owns NO open/close state of its own — it renders whatever the
-// parent says.
-//
-// THE FORM IS STILL UNCONTROLLED FROM THE PARENT'S PERSPECTIVE:
-// The parent doesn't track the field values — that's the modal's internal concern.
-// The modal calls `onSubmit(product)` once when ready, handing the final object
-// back to the parent to dispatch to the context.
-
 "use client";
 
 import { useState } from "react";
@@ -29,8 +5,8 @@ import type { Product, Genre } from "@/lib/mock-data";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-// Internal form state — price and stock are strings while the user types
-// so they can enter "9." without React stripping the trailing dot.
+// price and stock are strings while the user types — allows "9." without React
+// stripping the trailing dot before the user finishes entering the value.
 interface ProductFormFields {
   title:    string;
   artist:   string;
@@ -61,14 +37,9 @@ const EMPTY_FIELDS: ProductFormFields = {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface AddProductModalProps {
-  // "add"  → empty form, title "Add New Product", button "Save Product"
-  // "edit" → form pre-filled from initialProduct, title "Edit Product"
   mode: "add" | "edit";
-  // Provided when mode === "edit" — used to pre-fill the form fields.
   initialProduct?: Product;
   onClose:  () => void;
-  // Called with the complete Product object (including id) once validation passes.
-  // The parent decides what to do with it (dispatch ADD_PRODUCT or UPDATE_PRODUCT).
   onSubmit: (product: Product) => void;
 }
 
@@ -81,12 +52,6 @@ export function AddProductModal({
   onSubmit,
 }: AddProductModalProps) {
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  //
-  // Fields are initialised from initialProduct when editing, EMPTY_FIELDS when adding.
-  // Because the modal is conditionally rendered by the parent ({isOpen && <Modal />}),
-  // it unmounts when closed and remounts when opened — so useState initialisation
-  // always runs fresh, picking up the latest initialProduct automatically.
   const [fields, setFields] = useState<ProductFormFields>(() =>
     initialProduct
       ? {
@@ -102,24 +67,18 @@ export function AddProductModal({
 
   const [errors, setErrors] = useState<ProductFormErrors>({});
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) {
     const { name, value } = e.target;
     setFields((prev) => ({ ...prev, [name]: value }));
-    // Clear this field's error as the user corrects it.
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
   function handleClose() {
     onClose();
-    // Reset errors on close so a re-opened modal starts clean.
     setErrors({});
   }
-
-  // ── Validation + submit ────────────────────────────────────────────────────
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -144,11 +103,8 @@ export function AddProductModal({
       return;
     }
 
-    // Build the complete Product object to hand back to the parent.
-    // For "add": generate a unique id with Date.now() — same pattern as orderId
-    //   in the checkout page. In iteration 2 the database assigns the id.
-    // For "edit": preserve the original id so UPDATE_PRODUCT finds the right row.
     const product: Product = {
+      // TODO iteration 2: database assigns the id on add
       id:         mode === "edit" && initialProduct ? initialProduct.id : String(Date.now()),
       title:      fields.title.trim(),
       artist:     fields.artist.trim(),
@@ -162,8 +118,6 @@ export function AddProductModal({
     onSubmit(product);
   }
 
-  // ── Input class builder ─────────────────────────────────────────────────────
-
   function inputClass(field: keyof ProductFormErrors): string {
     return [
       "w-full rounded-lg border px-3.5 py-2.5 text-sm transition-colors",
@@ -174,25 +128,17 @@ export function AddProductModal({
     ].join(" ");
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-  //
-  // The parent controls visibility via `isOpen` — this component renders nothing
-  // when isOpen is false (the parent does `{isOpen && <AddProductModal .../>}`).
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 
-      {/* Backdrop — clicking it closes without saving */}
       <div
         className="absolute inset-0 bg-black/50"
         onClick={handleClose}
         aria-hidden="true"
       />
 
-      {/* Dialog box */}
       <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
 
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h2 className="text-lg font-bold text-slate-800">
             {mode === "add" ? "Add New Product" : "Edit Product"}
@@ -208,10 +154,8 @@ export function AddProductModal({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 p-6">
 
-          {/* Title */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="title" className="text-sm font-medium text-slate-700">
               Album title <span className="text-red-400">*</span>
@@ -228,7 +172,6 @@ export function AddProductModal({
             )}
           </div>
 
-          {/* Artist */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="artist" className="text-sm font-medium text-slate-700">
               Artist <span className="text-red-400">*</span>
@@ -245,13 +188,10 @@ export function AddProductModal({
             )}
           </div>
 
-          {/* Genre — fixed dropdown, not free-text */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="genre" className="text-sm font-medium text-slate-700">
               Genre
             </label>
-            {/* <select> is a controlled input — same value + onChange pattern as <input>.
-                The only difference is that `value` sets the selected option. */}
             <select
               id="genre" name="genre"
               value={fields.genre}
@@ -264,7 +204,6 @@ export function AddProductModal({
             </select>
           </div>
 
-          {/* Price + Stock side by side */}
           <div className="grid grid-cols-2 gap-4">
 
             <div className="flex flex-col gap-1.5">
@@ -301,7 +240,6 @@ export function AddProductModal({
 
           </div>
 
-          {/* Image URL — optional */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="imageUrl" className="text-sm font-medium text-slate-700">
               Image URL{" "}
@@ -319,7 +257,6 @@ export function AddProductModal({
             </p>
           </div>
 
-          {/* Action buttons */}
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
             <button
               type="button"

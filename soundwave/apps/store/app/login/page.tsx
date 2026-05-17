@@ -1,33 +1,3 @@
-// ─── /login page ──────────────────────────────────────────────────────────────
-//
-// CONCEPTS USED ON THIS PAGE:
-//
-// 1. CONTROLLED INPUT
-//    A "controlled input" means React owns the value of every text field —
-//    the input's `value` prop is wired to a piece of state, and the input can
-//    only change by updating that state. This gives us a single source of truth:
-//    at any moment, `fields.email` reflects exactly what the user has typed.
-//
-//    Uncontrolled input (the alternative): the browser owns the value and you
-//    read it with a ref at submit time. Controlled is preferred for forms that
-//    need real-time validation or conditional UI.
-//
-// 2. onChange EVENT
-//    Every <input> fires an `onChange` event whenever the user types, pastes,
-//    or deletes a character. React gives us a `React.ChangeEvent<HTMLInputElement>`
-//    object. We read `e.target.name` (which field changed) and `e.target.value`
-//    (the new text) to update state.
-//
-// 3. CLIENT-SIDE vs SERVER-SIDE VALIDATION
-//    Client-side (this page): runs in the browser with JavaScript. It gives
-//    instant feedback without a round-trip to the server — great for UX.
-//    BUT it is not a security boundary: users can bypass it by disabling JS
-//    or sending raw HTTP requests. Always re-validate on the server too.
-//
-//    Server-side (iteration 2): runs in an API route or server action before
-//    the data touches the database. It's the authoritative check and cannot
-//    be bypassed by the user.
-
 "use client";
 
 import { useState } from "react";
@@ -36,14 +6,11 @@ import Link from "next/link";
 import { useUser } from "@/contexts/UserContext";
 
 // ─── Email regex ──────────────────────────────────────────────────────────────
-// Checks for the basic pattern: something @ something . something
-// It's intentionally loose — full RFC 5321 email validation is very complex
-// and usually not worth it on the client side.
+// Loose structural check — full RFC 5321 validation is not worth it client-side.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-// Optional fields — a missing key means "no error for this field".
 interface LoginErrors {
   email?: string;
   password?: string;
@@ -52,82 +19,46 @@ interface LoginErrors {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-
   const router = useRouter();
   const { login } = useUser();
 
-  // ── State ──────────────────────────────────────────────────────────────────
   const [fields, setFields] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<LoginErrors>({});
 
-  // ── handleChange ───────────────────────────────────────────────────────────
-  //
-  // This single function handles ALL inputs. It works because each <input>
-  // has a `name` attribute that matches the corresponding key in `fields`.
-  //
-  // e.target.name  → which field changed ("email" or "password")
-  // e.target.value → what the user typed
-  //
-  // We also clear that field's error immediately, so the red message disappears
-  // as soon as the user starts correcting their input — better UX than waiting
-  // for them to re-submit.
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-
-    // Spread the old fields, overwrite only the one that changed.
     setFields((prev) => ({ ...prev, [name]: value }));
-
-    // Clear the error for this field (if any) so it disappears while typing.
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
-  // ── handleSubmit ───────────────────────────────────────────────────────────
-  //
-  // Called when the <form> fires its submit event (button click or Enter key).
-  // e.preventDefault() stops the browser's default behaviour, which would be
-  // to reload the page and send the data as a GET/POST request — we don't want
-  // that; we handle the data ourselves.
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    // Collect all validation failures into one object before setting state.
-    // This way, all errors appear at once instead of one-at-a-time.
     const newErrors: LoginErrors = {};
 
     if (!EMAIL_REGEX.test(fields.email)) {
       newErrors.email = "Please enter a valid email address.";
     }
-
     if (fields.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters.";
     }
-
-    // If anything failed, show the errors and stop here.
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // Mock login: store the username derived from the email in UserContext,
-    // then redirect to the store home page.
-    // In iteration 2 this will be replaced by a real API call.
+    // TODO iteration 2: replace with real API call
     console.log("Login submitted:", fields);
     login(fields.email.split("@")[0] ?? fields.email);
     router.push("/");
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
-    // Full-screen centred layout — flex column to stack the card on small screens.
     <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
 
-      {/* Card container — same rounded-2xl + shadow-sm style used across the app */}
       <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
 
-        {/* ── Heading ──────────────────────────────────────────────────────── */}
         <div className="mb-8 text-center">
-          {/* Logo mark — clicking returns to home */}
           <Link href="/" className="text-2xl font-bold text-indigo-600">
             Soundwave
           </Link>
@@ -137,26 +68,12 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* ── Form ─────────────────────────────────────────────────────────── */}
-        {/* onSubmit on the <form> element — fires when the user clicks the
-            submit button OR presses Enter in any field. */}
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-          {/* noValidate disables the browser's built-in validation popups so
-              our custom inline messages are the only ones that show. */}
 
-          {/* ── Email field ────────────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="email" className="text-sm font-medium text-gray-700">
               Email address
             </label>
-
-            {/* CONTROLLED INPUT:
-                value={fields.email}      ← React controls what's displayed
-                onChange={handleChange}   ← React updates state on every keystroke
-                name="email"             ← handleChange uses this to know which field changed */}
             <input
               id="email"
               name="email"
@@ -165,29 +82,21 @@ export default function LoginPage() {
               placeholder="you@example.com"
               value={fields.email}
               onChange={handleChange}
-              // Conditionally add red border when there's a validation error.
               className={`w-full rounded-lg border px-4 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-100 ${
                 errors.email
                   ? "border-red-400 focus:border-red-400"
                   : "border-gray-200 focus:border-indigo-400"
               }`}
             />
-
-            {/* Error message — only rendered when errors.email is defined */}
             {errors.email && (
               <p className="text-xs font-medium text-red-500">{errors.email}</p>
             )}
           </div>
 
-          {/* ── Password field ─────────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="password" className="text-sm font-medium text-gray-700">
               Password
             </label>
-
             <input
               id="password"
               name="password"
@@ -202,14 +111,11 @@ export default function LoginPage() {
                   : "border-gray-200 focus:border-indigo-400"
               }`}
             />
-
             {errors.password && (
               <p className="text-xs font-medium text-red-500">{errors.password}</p>
             )}
           </div>
 
-          {/* ── Submit button ──────────────────────────────────────────────── */}
-          {/* type="submit" triggers the form's onSubmit when clicked */}
           <button
             type="submit"
             className="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
@@ -219,13 +125,9 @@ export default function LoginPage() {
 
         </form>
 
-        {/* ── Switch link ──────────────────────────────────────────────────── */}
         <p className="mt-6 text-center text-sm text-gray-500">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="font-semibold text-indigo-600 hover:text-indigo-700"
-          >
+          <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
             Register
           </Link>
         </p>
