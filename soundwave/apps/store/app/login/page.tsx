@@ -31,7 +31,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser } from "@/contexts/UserContext";
 
 // ─── Email regex ──────────────────────────────────────────────────────────────
 // Checks for the basic pattern: something @ something . something
@@ -51,20 +53,12 @@ interface LoginErrors {
 
 export default function LoginPage() {
 
+  const router = useRouter();
+  const { login } = useUser();
+
   // ── State ──────────────────────────────────────────────────────────────────
-  //
-  // `fields` holds the current value of every input.
-  // We use one object (not two separate useState calls) so we can handle every
-  // field with a single, generic handleChange function.
   const [fields, setFields] = useState({ email: "", password: "" });
-
-  // `errors` holds any validation messages keyed by field name.
-  // When an error is undefined, no message is shown for that field.
   const [errors, setErrors] = useState<LoginErrors>({});
-
-  // `submitted` becomes true after a successful submit so we can show the
-  // success banner without navigating away (no real auth yet).
-  const [submitted, setSubmitted] = useState(false);
 
   // ── handleChange ───────────────────────────────────────────────────────────
   //
@@ -114,10 +108,12 @@ export default function LoginPage() {
       return;
     }
 
-    // All fields are valid — log the data and show success.
-    // In iteration 2 this will be replaced by an API call or server action.
+    // Mock login: store the username derived from the email in UserContext,
+    // then redirect to the store home page.
+    // In iteration 2 this will be replaced by a real API call.
     console.log("Login submitted:", fields);
-    setSubmitted(true);
+    login(fields.email.split("@")[0] ?? fields.email);
+    router.push("/");
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -140,15 +136,6 @@ export default function LoginPage() {
             Sign in to your account to continue.
           </p>
         </div>
-
-        {/* ── Success banner ───────────────────────────────────────────────── */}
-        {/* Only rendered after a successful submit. The form stays on screen
-            so the user can see their submitted values (helpful while learning). */}
-        {submitted && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
-            Logged in! Check the browser console for submitted data.
-          </div>
-        )}
 
         {/* ── Form ─────────────────────────────────────────────────────────── */}
         {/* onSubmit on the <form> element — fires when the user clicks the

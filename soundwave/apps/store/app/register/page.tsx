@@ -13,7 +13,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser } from "@/contexts/UserContext";
 
 // ─── Email regex ──────────────────────────────────────────────────────────────
 // Same loose pattern as the login page — basic structural check only.
@@ -32,9 +34,11 @@ interface RegisterErrors {
 
 export default function RegisterPage() {
 
+  const router = useRouter();
+  const { login } = useUser();
+
   // ── State ──────────────────────────────────────────────────────────────────
 
-  // Four controlled fields — one state object keeps handleChange generic.
   const [fields, setFields] = useState({
     name: "",
     email: "",
@@ -42,11 +46,7 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
 
-  // One error per field — undefined means "no error, show nothing".
   const [errors, setErrors] = useState<RegisterErrors>({});
-
-  // Toggled to true after a valid submit so the success banner appears.
-  const [submitted, setSubmitted] = useState(false);
 
   // ── handleChange ───────────────────────────────────────────────────────────
   //
@@ -96,15 +96,15 @@ export default function RegisterPage() {
       return;
     }
 
-    // Valid — log and show the success banner.
-    // The `confirmPassword` field is intentionally excluded from the log
-    // because it's redundant once passwords have been verified to match.
+    // Mock registration: log the data, log the user in with their name,
+    // then redirect to the store home page.
     console.log("Register submitted:", {
       name: fields.name,
       email: fields.email,
       password: fields.password,
     });
-    setSubmitted(true);
+    login(fields.name);
+    router.push("/");
   }
 
   // ── Shared input class builder ──────────────────────────────────────────────
@@ -140,13 +140,6 @@ export default function RegisterPage() {
             Join Soundwave and start building your collection.
           </p>
         </div>
-
-        {/* ── Success banner ───────────────────────────────────────────────── */}
-        {submitted && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
-            Account created! Check the browser console for submitted data.
-          </div>
-        )}
 
         {/* ── Form ─────────────────────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">

@@ -10,7 +10,11 @@
 // components are allowed to render client components — Next.js handles the
 // boundary automatically. Only CartIcon's code is shipped to the browser.
 
+import Link from "next/link";
 import { CartIcon } from "@/components/CartIcon";
+// NavbarAuthSection is a client component that reads UserContext and renders
+// either "Login / Register" links or the logged-in user's name + Logout button.
+import { NavbarAuthSection } from "@/components/NavbarAuthSection";
 
 export function Navbar() {
   return (
@@ -27,9 +31,9 @@ export function Navbar() {
 
           {/* ── Logo ─────────────────────────────────────────────────────── */}
           {/* Clicking the logo navigates back to the home page. */}
-          <a href="/" className="text-2xl font-bold text-indigo-600">
+          <Link href="/" className="text-2xl font-bold text-indigo-600">
             Soundwave
-          </a>
+          </Link>
 
           {/* ── Navigation links ─────────────────────────────────────────── */}
           {/* hidden sm:flex means: hidden on phones, visible as a flex row
@@ -46,12 +50,13 @@ export function Navbar() {
             <CartIcon />
           </div>
 
-          {/* ── Login button ─────────────────────────────────────────────── */}
-          {/* rounded-full makes it a "pill" shape. This is always visible,
-              even on mobile, so users can always log in. */}
-          <button className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
-            Login
-          </button>
+          {/* ── Auth section ─────────────────────────────────────────────── */}
+          {/* NavbarAuthSection is a client component that reads UserContext.
+              When logged out: shows Login (Link) + Register (Link).
+              When logged in:  shows user's initial avatar + name + Logout button.
+              Server components can render client components — only this file's
+              code crosses into the browser bundle. */}
+          <NavbarAuthSection />
 
         </div>
       </div>

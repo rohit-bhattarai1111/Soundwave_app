@@ -208,14 +208,26 @@ export default function CartPage() {
                   Clear Cart
                 </button>
 
-                {/* Placeholder checkout button — no payment flow yet */}
-                <button
-                  disabled
-                  title="Checkout coming soon"
-                  className="cursor-not-allowed rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white opacity-50"
-                >
-                  Checkout
-                </button>
+                {/* Checkout button — Link when cart has items, disabled button when empty.
+                    <Link> cannot be `disabled`, so we render a real Link vs a
+                    styled-as-disabled button depending on cart state. */}
+                {state.items.length > 0 ? (
+                  <Link
+                    href="/checkout"
+                    className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  >
+                    Checkout
+                  </Link>
+                ) : (
+                  <button
+                    disabled
+                    aria-disabled="true"
+                    title="Add items to your cart first"
+                    className="cursor-not-allowed rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white opacity-40"
+                  >
+                    Checkout
+                  </button>
+                )}
 
               </div>
             </div>

@@ -1,57 +1,148 @@
-# Soundwave — Turborepo Monorepo
+# Soundwave
 
-A monorepo for the Soundwave music platform, managed with [Turborepo](https://turborepo.dev).
+[![CI](https://github.com/rohit-bhattarai1111/Soundwave_app/actions/workflows/ci.yml/badge.svg)](https://github.com/rohit-bhattarai1111/Soundwave_app/actions/workflows/ci.yml)
 
-## Project Structure
+A full-stack B2C music store built as a learning project across two iterations.
+**Iteration 1** (this branch) is a complete, interactive frontend with mock data and
+client-side state. **Iteration 2** will add a real database, REST API, and production
+authentication.
+
+The project is a Turborepo monorepo containing two Next.js 14 apps — a customer-facing
+store and an internal admin dashboard — that share a common UI package.
+
+---
+
+## Screenshots
+
+| Store | Admin |
+|---|---|
+| ![Store](./docs/store-screenshot.png) | ![Admin](./docs/admin-screenshot.png) |
+
+> Screenshots coming soon — add real images to `docs/` and update the paths above.
+
+---
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Monorepo tooling | [Turborepo](https://turborepo.dev) |
+| Apps | [Next.js 14](https://nextjs.org) (App Router) |
+| Language | TypeScript (strict mode) |
+| Styling | Tailwind CSS |
+| State management | React Context + `useReducer` |
+| Package manager | pnpm workspaces |
+| CI | GitHub Actions |
+
+---
+
+## Folder Structure
 
 ```
-soundwave/
+soundwave/                     ← monorepo root
+├── .github/
+│   └── workflows/
+│       └── ci.yml             ← GitHub Actions CI pipeline
 ├── apps/
-│   ├── store/          # Customer-facing music store  (port 3000)
-│   └── admin/          # Internal admin dashboard     (port 3001)
+│   ├── store/                 ← Customer-facing music store  (port 3000)
+│   │   ├── app/               ← Next.js App Router pages
+│   │   ├── components/        ← Store-specific UI components
+│   │   └── contexts/          ← CartContext, UserContext
+│   └── admin/                 ← Internal admin dashboard     (port 3001)
+│       ├── app/               ← Next.js App Router pages
+│       ├── components/        ← Admin-specific UI components
+│       ├── contexts/          ← AuthContext, ProductsContext
+│       └── lib/               ← Mock data (replaced by DB in iteration 2)
 └── packages/
-    └── ui/             # Shared UI components (@soundwave/ui)
+    ├── ui/                    ← Shared UI components (@soundwave/ui)
+    ├── eslint-config/         ← Shared ESLint rules (@repo/eslint-config)
+    └── typescript-config/     ← Shared tsconfig (@repo/typescript-config)
 ```
+
+---
 
 ## Getting Started
+
+**Prerequisites:** Node.js ≥ 18, pnpm ≥ 9
 
 **Install dependencies** (run once from the repo root):
 
 ```sh
-cd soundwave
-npm install
+pnpm install
 ```
 
-**Run both apps at the same time:**
+**Run both apps simultaneously:**
 
 ```sh
-npm run dev
-# store → http://localhost:3000
-# admin → http://localhost:3001
+pnpm run dev
 ```
 
-**Build all apps for production:**
+Turborepo starts both apps in parallel. Open them in your browser:
+
+| App | URL |
+|---|---|
+| Store | http://localhost:3000 |
+| Admin | http://localhost:3001 |
+
+**Build for production:**
 
 ```sh
-npm run build
+pnpm run build
+```
+
+**Lint all packages:**
+
+```sh
+pnpm run lint
 ```
 
 **Run a single app only:**
 
 ```sh
-npx turbo dev --filter=store
-npx turbo dev --filter=admin
+pnpm turbo dev --filter=store
+pnpm turbo dev --filter=admin
 ```
 
-## Tech Stack
+---
 
-| Layer | Choice |
-|-------|--------|
-| Monorepo | Turborepo |
-| Apps | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS |
-| Package manager | npm workspaces |
+## Admin Login
+
+The admin dashboard uses **hardcoded credentials** for Iteration 1 (no database yet).
+
+| Field | Value |
+|---|---|
+| Email | `admin@soundwave.com` |
+| Password | `admin123` |
+
+> **Iteration 2 note:** These credentials will be replaced with a real authentication
+> system using bcrypt password hashing and HTTP-only session cookies. Never use
+> hardcoded credentials in production.
+
+---
+
+## Project Status
+
+### Iteration 1 — Frontend Complete
+
+| Feature | Status |
+|---|---|
+| Product catalogue (store) | Done |
+| Shopping cart (Context + useReducer) | Done |
+| Checkout flow + order success page | Done |
+| Customer login / register (mock) | Done |
+| Admin login (hardcoded credentials) | Done |
+| Products CRUD (in-memory state) | Done |
+| Orders table (mock data) | Done |
+| CI pipeline (GitHub Actions) | Done |
+
+### Iteration 2 — Backend (upcoming)
+
+- PostgreSQL database (Prisma ORM)
+- REST API routes (`/api/products`, `/api/orders`, `/api/auth`)
+- Real authentication — bcrypt hashing, HTTP-only session cookies
+- Server-side validation (not just client-side)
+- Image uploads (replace picsum.photos placeholders)
+- Deployment (Vercel / Railway)
 
 ---
 
@@ -59,23 +150,34 @@ npx turbo dev --filter=admin
 
 ### What is Turborepo?
 
-Think of Turborepo as a **traffic controller for a big project made of many smaller projects**. Normally if you have two separate websites, you'd open two terminal windows and run each one manually. Turborepo lets you type a single command (`npm run dev`) and it starts *all* your apps at the same time. It also remembers which parts of your code already built successfully, so it skips re-running things that haven't changed — like a smart build cache.
+Think of Turborepo as a **traffic controller for a big project made of many smaller
+projects**. Without it, running two separate websites means opening two terminal windows
+and starting each one by hand. Turborepo lets you type `pnpm run dev` once and it starts
+*all* your apps in parallel. It also remembers which parts of your code already built
+successfully and skips re-building them — like a smart cache that saves time on every run.
 
 ### What is the `packages/` folder for?
 
-The `packages/` folder holds **code that is shared between your apps**. Imagine you design a button component. Without a shared package, you'd copy-paste that button into both `store/` and `admin/`. If you later want to change its colour, you'd have to update it in two places and hope you don't forget one. With `packages/ui`, you write the button **once**, both apps import it, and a single change updates everywhere instantly.
+The `packages/` folder holds **code shared between both apps**. Imagine you design a
+button component. Without a shared package, you'd copy-paste it into both `store/` and
+`admin/`. If you later want to change its colour, you'd have to update it in two places.
+With `packages/ui`, you write the button *once*, both apps import it, and a single change
+updates everywhere instantly.
 
 ### Why two separate Next.js apps instead of one?
 
-The store and admin have **very different audiences and requirements**:
+The store and admin have **very different audiences and security requirements**:
 
-- **Store** (`apps/store`) — public-facing, needs SEO, fast load times, attractive design for customers.
-- **Admin** (`apps/admin`) — internal tool, only staff can access it, needs a login wall, different security rules, a completely different visual layout.
+- **Store** (`apps/store`) — public-facing, needs fast load times and great SEO for
+  customers browsing albums.
+- **Admin** (`apps/admin`) — internal tool, only staff access it, needs a login wall,
+  completely different visual design, and tighter security rules.
 
 Keeping them as separate apps means:
-1. You can deploy them independently (e.g. admin behind a VPN, store on a CDN).
-2. A bug in the admin code cannot crash the store.
-3. Each app only ships the code it actually needs — no bloat.
-4. Different teams can own each app without stepping on each other.
+1. You can deploy them independently (admin behind a VPN, store on a public CDN).
+2. A bug in the admin cannot crash the customer store.
+3. Each app only ships the JavaScript it actually needs — no bloat.
+4. Different developers can own each app without merge conflicts.
 
-The `packages/` folder bridges them — shared code lives there, app-specific code stays inside each app.
+The `packages/` folder bridges them — shared code lives there, app-specific code stays
+inside each app.

@@ -18,6 +18,11 @@ import "./globals.css";
 // server component — Next.js allows server components to render client components.
 import { CartProvider } from "@/contexts/CartContext";
 
+// UserProvider makes { user, login, logout } available to any component via
+// useUser(). It wraps the same tree as CartProvider so both contexts are
+// accessible everywhere — Navbar reads both (cart count + auth state).
+import { UserProvider } from "@/contexts/UserContext";
+
 // This metadata object populates the <title> and <meta name="description">
 // tags in the page's <head> automatically — no need to write them manually.
 export const metadata: Metadata = {
@@ -44,7 +49,11 @@ export default function RootLayout({
       {/* CartProvider makes { state, dispatch } available to any component
           inside this tree via the useCart() hook — no prop drilling needed. */}
       <body className="bg-white text-gray-900 antialiased">
-        <CartProvider>{children}</CartProvider>
+        {/* UserProvider must wrap CartProvider (or vice versa — order doesn't
+            matter) so both contexts are available to every child component. */}
+        <UserProvider>
+          <CartProvider>{children}</CartProvider>
+        </UserProvider>
       </body>
     </html>
   );
