@@ -9,8 +9,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { ProductsProvider } from "@/contexts/ProductsContext";
 import { AdminShell } from "@/components/AdminShell";
+// ProductsProvider was removed from layout — it now lives inside products/page.tsx
+// (a Server Component) so it can receive real DB data as initialProducts.
 
 export const metadata: Metadata = {
   title: "Soundwave Admin",
@@ -28,12 +29,10 @@ export default function RootLayout({
       <body className="overflow-hidden bg-slate-950 text-slate-900 antialiased">
         {/* Providers wraps the whole app in SessionProvider so useSession() works everywhere */}
         <Providers>
-          {/* ProductsProvider still uses mock data — will be replaced with DB in a later iteration */}
-          <ProductsProvider>
-            <AdminShell>
-              {children}
-            </AdminShell>
-          </ProductsProvider>
+          {/* AdminShell renders the sidebar+header when authenticated, or just {children} on /login */}
+          <AdminShell>
+            {children}
+          </AdminShell>
         </Providers>
       </body>
     </html>

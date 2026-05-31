@@ -39,8 +39,11 @@ const EMPTY_FIELDS: ProductFormFields = {
 interface AddProductModalProps {
   mode: "add" | "edit";
   initialProduct?: Product;
-  onClose:  () => void;
-  onSubmit: (product: Product) => void;
+  onClose:      () => void;
+  onSubmit:     (product: Product) => void;
+  // Passed from the parent while a fetch is in flight — disables the submit button
+  // so the admin can't fire duplicate requests by clicking "Save" multiple times.
+  isSubmitting?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -50,6 +53,7 @@ export function AddProductModal({
   initialProduct,
   onClose,
   onSubmit,
+  isSubmitting = false,
 }: AddProductModalProps) {
 
   const [fields, setFields] = useState<ProductFormFields>(() =>
@@ -261,15 +265,21 @@ export function AddProductModal({
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              disabled={isSubmitting}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+              disabled={isSubmitting}
+              className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {mode === "add" ? "Save Product" : "Update Product"}
+              {/* Show a spinner-style label while the API call is in flight */}
+              {isSubmitting
+                ? (mode === "add" ? "Saving…" : "Updating…")
+                : (mode === "add" ? "Save Product" : "Update Product")
+              }
             </button>
           </div>
 
