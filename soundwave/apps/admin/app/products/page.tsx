@@ -1,11 +1,11 @@
 "use client";
 
+// Products page — protection is handled by middleware.ts (role check), not ProtectedRoute.
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useProducts } from "@/contexts/ProductsContext";
 import { AddProductModal } from "@/components/AddProductModal";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 import type { Product } from "@/lib/mock-data";
 
 // ─── Genre badge colours ──────────────────────────────────────────────────────
@@ -79,8 +79,7 @@ export default function ProductsPage() {
   }
 
   return (
-    <ProtectedRoute>
-      <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
 
         <div className="flex items-center justify-between">
           <div>
@@ -196,8 +195,6 @@ export default function ProductsPage() {
           </table>
         </div>
 
-      </div>
-
       {modal.isOpen && (
         <AddProductModal
           mode={modal.mode}
@@ -224,6 +221,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-    </ProtectedRoute>
+    </div>
   );
 }

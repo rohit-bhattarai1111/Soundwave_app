@@ -1,18 +1,35 @@
 "use client";
 
+// AdminShell — the outer chrome for every authenticated admin page.
+// Shows the Sidebar + top header once logged in.
+//
+// CHANGED from iteration 1:
+//   Before: used useAuth() from AuthContext (checked sessionStorage).
+//   After:  uses useSession() from NextAuth (reads the httpOnly cookie via
+//           the /api/auth/session endpoint).
+//           The isLoading check is now `status === "loading"` instead of
+//           AuthContext's isLoading flag.
+//           The isAuthenticated check is now `status === "authenticated"`.
+
 import type { ReactNode } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function AdminShell({ children }: { children: ReactNode }) {
-  const { isLoading, isAuthenticated } = useAuth();
+  // useSession() returns:
+  //   { data: session, status: "loading" }      — while fetching
+  //   { data: session, status: "authenticated" } — logged in
+  //   { data: null, status: "unauthenticated" }  — not logged in
+  const { data: session, status } = useSession();
 
-  // Wait for sessionStorage to be read before rendering to avoid a layout flash
-  if (isLoading) return null;
+  // While NextAuth is fetching the session, render nothing to prevent flash.
+  // (middleware.ts has already checked auth server-side, so this is just UX.)
+  if (status === "loading") return null;
 
-  if (!isAuthenticated) return <>{children}</>;
+  // Not authenticated — show the children as-is (the login page).
+  // middleware.ts redirects non-admins away before this even renders,
+  // but the layout always wraps /login too, so we need this branch.
+  if (status === "unauthenticated") return <>{children}</>;
 
   return (
     <div className="flex h-screen">
@@ -25,7 +42,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <p className="text-sm font-medium text-slate-500">
             Soundwave Admin Panel
           </p>
-          <AdminUserBadge />
+          {/* Show the logged-in admin's email from the real session */}
+          <AdminUserBadge email={session?.user?.email ?? ""} />
         </header>
 
         <main className="flex-1 overflow-y-auto bg-slate-50 p-8">
@@ -38,11 +56,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
 }
 
 // ─── AdminUserBadge ───────────────────────────────────────────────────────────
-// Reads the logged-in user from context and renders their email in the top bar.
 
-function AdminUserBadge() {
-  const { user } = useAuth();
-
+function AdminUserBadge({ email }: { email: string }) {
   return (
     <div className="flex items-center gap-3">
       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
@@ -50,7 +65,7 @@ function AdminUserBadge() {
       </div>
       <div className="text-sm">
         <p className="font-semibold text-slate-800">Admin User</p>
-        <p className="text-xs text-slate-400">{user?.email ?? "admin@soundwave.com"}</p>
+        <p className="text-xs text-slate-400">{email}</p>
       </div>
     </div>
   );

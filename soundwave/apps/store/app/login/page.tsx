@@ -1,18 +1,27 @@
 "use client";
 
+// login/page.tsx — store login form, wired to the real database via NextAuth.
+//
+// CHANGED from iteration 1:
+//   Before: handleSubmit called login() from UserContext (fake in-memory state).
+//   After:  handleSubmit calls signIn("credentials") from next-auth/react.
+//           NextAuth POSTs to /api/auth/callback/credentials, which runs
+//           the authorize() function in packages/auth/src/index.ts.
+//           If the credentials are valid, NextAuth creates a Session row in
+//           the DB and sets an httpOnly cookie in the browser.
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useUser } from "@/contexts/UserContext";
 
 // ─── Email regex ──────────────────────────────────────────────────────────────
-// Loose structural check — full RFC 5321 validation is not worth it client-side.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LoginErrors {
-  email?: string;
+  email?:   string;
   password?: string;
 }
 
@@ -20,37 +29,63 @@ interface LoginErrors {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useUser();
 
-  const [fields, setFields] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState<LoginErrors>({});
+  const [fields,      setFields]      = useState({ email: "", password: "" });
+  const [errors,      setErrors]      = useState<LoginErrors>({});
+  // serverError shows a message for wrong credentials (no field-level detail on
+  // purpose — don't hint which field was wrong to an attacker).
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading,     setLoading]     = useState(false);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setFields((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined }));
+    setServerError(null);
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
+    // ── Client-side validation ─────────────────────────────────────────────
     const newErrors: LoginErrors = {};
-
-    if (!EMAIL_REGEX.test(fields.email)) {
-      newErrors.email = "Please enter a valid email address.";
-    }
-    if (fields.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters.";
-    }
+    if (!EMAIL_REGEX.test(fields.email))  newErrors.email    = "Please enter a valid email address.";
+    if (fields.password.length < 6)       newErrors.password = "Password must be at least 6 characters.";
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // TODO iteration 2: replace with real API call
-    console.log("Login submitted:", fields);
-    login(fields.email.split("@")[0] ?? fields.email);
-    router.push("/");
+    // ── NextAuth sign-in ───────────────────────────────────────────────────
+    setLoading(true);
+    setServerError(null);
+
+    // signIn("credentials", ...) from next-auth/react makes a POST to
+    // /api/auth/callback/credentials. The server runs authorize() and either
+    // creates a session (sets an httpOnly cookie) or returns an error.
+    //
+    // `redirect: false` means we handle the redirect ourselves instead of
+    // NextAuth refreshing the whole page on success.
+    const result = await signIn("credentials", {
+      email:    fields.email,
+      password: fields.password,
+      redirect: false,
+    });
+
+    setLoading(false);
+
+    if (result?.ok) {
+      // Login succeeded — redirect to home (or wherever callbackUrl says).
+      // router.push refreshes the page so Server Components re-render with
+      // the new session from the httpOnly cookie.
+      const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl");
+      router.push(callbackUrl ?? "/");
+      router.refresh(); // force Server Components to re-read auth()
+    } else {
+      // NextAuth returns error="CredentialsSignin" for wrong password/email.
+      // We show a vague message — never confirm which field was wrong.
+      setServerError("Invalid email or password.");
+    }
   }
 
   return (
@@ -83,9 +118,7 @@ export default function LoginPage() {
               value={fields.email}
               onChange={handleChange}
               className={`w-full rounded-lg border px-4 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-100 ${
-                errors.email
-                  ? "border-red-400 focus:border-red-400"
-                  : "border-gray-200 focus:border-indigo-400"
+                errors.email ? "border-red-400 focus:border-red-400" : "border-gray-200 focus:border-indigo-400"
               }`}
             />
             {errors.email && (
@@ -106,9 +139,7 @@ export default function LoginPage() {
               value={fields.password}
               onChange={handleChange}
               className={`w-full rounded-lg border px-4 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-100 ${
-                errors.password
-                  ? "border-red-400 focus:border-red-400"
-                  : "border-gray-200 focus:border-indigo-400"
+                errors.password ? "border-red-400 focus:border-red-400" : "border-gray-200 focus:border-indigo-400"
               }`}
             />
             {errors.password && (
@@ -116,11 +147,19 @@ export default function LoginPage() {
             )}
           </div>
 
+          {/* Wrong credentials error — vague by design (security best practice) */}
+          {serverError && (
+            <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
+              {serverError}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+            disabled={loading}
+            className="mt-2 w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Log in
+            {loading ? "Signing in…" : "Log in"}
           </button>
 
         </form>

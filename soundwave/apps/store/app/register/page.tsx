@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useUser } from "@/contexts/UserContext";
 
 // ─── Email regex ──────────────────────────────────────────────────────────────
 // Loose structural check — full RFC 5321 validation is not worth it client-side.
@@ -22,7 +22,6 @@ interface RegisterErrors {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { login } = useUser();
 
   const [fields, setFields] = useState({
     name: "",
@@ -88,10 +87,16 @@ export default function RegisterPage() {
       });
 
       if (res.ok) {
-        // 201 Created — registration succeeded.
-        // Log the user in client-side and redirect to home.
-        login(fields.name);
+        // 201 Created — user row is in the DB.
+        // Auto sign-in: call NextAuth's credentials flow so the user doesn't
+        // have to log in again immediately after registering.
+        await signIn("credentials", {
+          email:    fields.email,
+          password: fields.password,
+          redirect: false,
+        });
         router.push("/");
+        router.refresh(); // re-render Server Components with the new session
         return;
       }
 

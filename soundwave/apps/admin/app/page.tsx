@@ -1,6 +1,7 @@
+// Dashboard page — protection is handled by middleware.ts, not ProtectedRoute.
+// middleware.ts runs before this page renders and redirects non-admins to /login.
 import Link from "next/link";
 import { products, orders } from "@/lib/mock-data";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // ─── Derived stats ────────────────────────────────────────────────────────────
 
@@ -22,7 +23,6 @@ export default function DashboardPage() {
   const recentProducts = [...products].slice(-5).reverse();
 
   return (
-    <ProtectedRoute>
     <div className="flex flex-col gap-8">
 
       <div>
@@ -115,7 +115,6 @@ export default function DashboardPage() {
       </div>
 
     </div>
-    </ProtectedRoute>
   );
 }
 

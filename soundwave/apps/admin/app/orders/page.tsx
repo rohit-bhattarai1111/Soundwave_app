@@ -1,5 +1,5 @@
+// Orders page — protection is handled by middleware.ts (role check), not ProtectedRoute.
 import { orders, type OrderStatus } from "@/lib/mock-data";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // ─── Status badge styles ──────────────────────────────────────────────────────
 // Full class strings — dynamic construction would be stripped at build time.
@@ -40,7 +40,6 @@ export default function OrdersPage() {
   const stats = getStats();
 
   return (
-    <ProtectedRoute>
     <div className="flex flex-col gap-6">
 
       <div>
@@ -126,6 +125,5 @@ export default function OrdersPage() {
         </table>
       </div>
     </div>
-    </ProtectedRoute>
   );
 }

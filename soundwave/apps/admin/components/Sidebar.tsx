@@ -1,8 +1,16 @@
 "use client";
 
+// Sidebar — navigation panel for the admin app.
+//
+// CHANGED from iteration 1:
+//   Before: logout() called useAuth().logout() which cleared sessionStorage.
+//   After:  signOut() from next-auth/react POSTs to /api/auth/signout,
+//           which deletes the Session row from the DB and clears the browser cookie.
+//           This is real revocation — the session can never be reused.
+
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
@@ -39,14 +47,7 @@ const NAV_ITEMS = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
-  const pathname  = usePathname();
-  const router    = useRouter();
-  const { logout } = useAuth();
-
-  function handleLogout() {
-    logout();
-    router.push("/login");
-  }
+  const pathname = usePathname();
 
   return (
     <aside className="sticky top-0 flex h-screen w-64 flex-shrink-0 flex-col bg-slate-900">
@@ -63,9 +64,8 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
         {NAV_ITEMS.map(({ label, href, icon }) => {
-          // Exact match for "/" to avoid marking every page as active
-          const isActive =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+          // Exact match for "/" to avoid marking every page as active.
+          const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
 
           return (
             <Link
@@ -89,8 +89,14 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-slate-800 p-3">
+        {/* signOut() from next-auth/react:
+            1. POSTs to /api/auth/signout
+            2. NextAuth deletes the Session row from the DB
+            3. Clears the session cookie in the browser
+            4. Redirects to callbackUrl
+            This is real revocation — the old session token can never be reused. */}
         <button
-          onClick={handleLogout}
+          onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
