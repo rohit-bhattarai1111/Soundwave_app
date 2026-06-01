@@ -8,10 +8,11 @@
     "./data":   "./src/data.ts"
   },
   "scripts": {
-    "db:migrate": "prisma migrate dev",
-    "db:seed":    "prisma db seed",
-    "db:studio":  "prisma studio",
-    "db:reset":   "prisma migrate reset --force"
+    "postinstall": "prisma generate",
+    "db:migrate":  "prisma migrate dev",
+    "db:seed":     "prisma db seed",
+    "db:studio":   "prisma studio",
+    "db:reset":    "prisma migrate reset --force"
   },
   "prisma": {
     "seed": "tsx src/seed.ts"

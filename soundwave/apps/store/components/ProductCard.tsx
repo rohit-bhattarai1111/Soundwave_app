@@ -21,19 +21,19 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { dispatch } = useCart();
+  // addItem replaces the old dispatch({ type: "ADD_ITEM" }) call.
+  // It dispatches locally (optimistic) AND fires POST /api/cart so the item
+  // is persisted to the DB for the logged-in user.
+  const { addItem } = useCart();
 
   function handleAddToCart() {
-    dispatch({
-      type: "ADD_ITEM",
-      payload: {
-        id:     product.id,
-        title:  product.title,
-        artist: product.artist,
-        // CartContext stores price as a decimal number (e.g. 9.99).
-        // We convert from cents at this boundary so CartContext stays unchanged.
-        price: product.priceInCents / 100,
-      },
+    addItem({
+      id:     product.id,
+      title:  product.title,
+      artist: product.artist,
+      // CartContext stores price as a decimal number (e.g. 9.99).
+      // We convert from cents here so CartContext stays unchanged.
+      price: product.priceInCents / 100,
     });
   }
 

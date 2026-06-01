@@ -1,11 +1,22 @@
 "use client";
 
+// cart/page.tsx — shows the user's cart with quantity controls and a checkout link.
+//
+// Iteration 2 changes:
+//   Before: dispatch({ type: "..." }) — local state only, not persisted.
+//   After:  useCart() exposes removeItem, updateQty, clearCart which each
+//           dispatch locally (optimistic) AND fire the matching API call
+//           to keep the DB in sync. Rollback happens automatically in CartContext
+//           if the API call fails.
+
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { useCart } from "@/contexts/CartContext";
 
 export default function CartPage() {
-  const { state, dispatch } = useCart();
+  // removeItem, updateQty, clearCart are the new semantic API from CartContext.
+  // They handle both local state (via dispatch) and DB sync (via fetch).
+  const { state, removeItem, updateQty, clearCart } = useCart();
 
   const subtotal = state.items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -86,13 +97,10 @@ export default function CartPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
 
+                          {/* Decrease quantity — if it reaches 0, CartContext removes the item
+                              locally (reducer filters quantity > 0) and calls DELETE /api/cart/[id] */}
                           <button
-                            onClick={() =>
-                              dispatch({
-                                type: "UPDATE_QTY",
-                                payload: { id: item.id, quantity: item.quantity - 1 },
-                              })
-                            }
+                            onClick={() => updateQty(item.id, item.quantity - 1)}
                             aria-label={`Decrease quantity of ${item.title}`}
                             className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
                           >
@@ -103,13 +111,9 @@ export default function CartPage() {
                             {item.quantity}
                           </span>
 
+                          {/* Increase quantity — fires PUT /api/cart/[id] with quantity + 1 */}
                           <button
-                            onClick={() =>
-                              dispatch({
-                                type: "UPDATE_QTY",
-                                payload: { id: item.id, quantity: item.quantity + 1 },
-                              })
-                            }
+                            onClick={() => updateQty(item.id, item.quantity + 1)}
                             aria-label={`Increase quantity of ${item.title}`}
                             className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
                           >
@@ -124,13 +128,9 @@ export default function CartPage() {
                       </td>
 
                       <td className="px-6 py-4 text-center">
+                        {/* removeItem fires DELETE /api/cart/[id] and removes from local state */}
                         <button
-                          onClick={() =>
-                            dispatch({
-                              type: "REMOVE_ITEM",
-                              payload: { id: item.id },
-                            })
-                          }
+                          onClick={() => removeItem(item.id)}
                           aria-label={`Remove ${item.title} from cart`}
                           className="text-xs font-medium text-red-400 transition-colors hover:text-red-600"
                         >
@@ -155,8 +155,9 @@ export default function CartPage() {
               </div>
 
               <div className="flex items-center gap-3">
+                {/* clearCart dispatches CLEAR_CART locally + fires DELETE /api/cart */}
                 <button
-                  onClick={() => dispatch({ type: "CLEAR_CART" })}
+                  onClick={() => clearCart()}
                   className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:border-red-300 hover:text-red-500"
                 >
                   Clear Cart
