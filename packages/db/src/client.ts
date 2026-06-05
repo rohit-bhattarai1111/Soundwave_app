@@ -38,6 +38,14 @@
 //   adapter, which forwards them to Turso over HTTP.
 //   This is why `previewFeatures = ["driverAdapters"]` is required in schema.prisma.
 //
+// ─── WHY THIS FILE IS NODE.JS-ONLY ────────────────────────────────────────────
+//   @libsql/client and its transitive dependency `libsql` are Node.js packages
+//   that use native Rust addons — they cannot run in Edge Runtime.
+//   This file is therefore NEVER imported by middleware.ts.
+//   Middleware imports from "@repo/auth/middleware" (edge-safe JWT config only).
+//   Both next.config.js files list @libsql/client in serverComponentsExternalPackages
+//   so webpack does not try to bundle its internals for the server-component chunk.
+//
 // ─── ENV VAR STRATEGY ─────────────────────────────────────────────────────────
 //   Local dev:   DATABASE_URL in apps/store/.env.local and apps/admin/.env.local
 //   Production:  DATABASE_URL set in Vercel project settings (env vars panel)
@@ -46,31 +54,9 @@
 //   We NEVER commit production secrets to git. .env.local files are gitignored.
 //   The Vercel env var panel is the production secret store.
 
-import { PrismaClient } from "@prisma/client";
-
-// ─── TYPE-ONLY imports (erased at compile time — webpack never sees them) ─────
-//
-// WHY "import type" instead of a regular import?
-// ────────────────────────────────────────────────
-// @libsql/client and @prisma/adapter-libsql are Node.js-only packages.
-// Their transitive dependency `libsql` contains a native Rust addon (a .node
-// binary) and uses a dynamic require() with a glob pattern (sync ^\.\/.*$)
-// that makes webpack scan EVERY file in the @libsql directory — including
-// README.md, LICENSE, etc.  When webpack encounters a non-JS file it throws:
-//   "Module parse failed: Unexpected token (1:4)"
-//
-// A regular `import { X } from "pkg"` is a static import — webpack's module
-// graph analyser processes it unconditionally, even for server-only code.
-//
-// `import type` is erased by TypeScript at compile time and NEVER appears in
-// the JavaScript output.  Webpack only sees the .js output, so it never knows
-// these packages exist and never tries to bundle them.
-//
-// The actual packages are loaded at RUNTIME inside the libsql:// branch below
-// using eval("require"), which is another webpack-bypass trick — webpack cannot
-// trace through eval(), so it doesn't follow that require() call either.
-import type { createClient as CreateClientType } from "@libsql/client";
-import type { PrismaLibSQL as PrismaLibSQLType } from "@prisma/adapter-libsql";
+import { PrismaClient }   from "@prisma/client";
+import { createClient }   from "@libsql/client";
+import { PrismaLibSQL }   from "@prisma/adapter-libsql";
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
@@ -79,32 +65,6 @@ function createPrismaClient(): PrismaClient {
 
   if (url.startsWith("libsql://")) {
     // ── Production path: Turso ──────────────────────────────────────────────
-    //
-    // WHY eval("require")?
-    // ─────────────────────
-    // `const r = require(...)` would be caught by webpack's static analyser and
-    // it would try to bundle the package (causing the README.md crash).
-    //
-    // `eval("require")` returns the real Node.js require function at runtime,
-    // but webpack's static analyser cannot see inside eval() — from webpack's
-    // perspective this is an opaque expression that could return anything.
-    // So webpack skips it entirely, and the packages are loaded by Node's own
-    // native module system when this branch actually executes (production only).
-    //
-    // The casts tell TypeScript what shape the dynamically-loaded modules have,
-    // using the `import type` declarations above (which are already erased by
-    // this point — they only served the TypeScript compiler, not webpack/Node).
-
-    // eslint-disable-next-line no-eval
-    const nodeRequire = eval("require") as NodeRequire;
-
-    const { createClient } = nodeRequire("@libsql/client") as {
-      createClient: typeof CreateClientType;
-    };
-    const { PrismaLibSQL } = nodeRequire("@prisma/adapter-libsql") as {
-      PrismaLibSQL: typeof PrismaLibSQLType;
-    };
-
     // createClient connects to the Turso server over HTTP.
     // The full libsql://host?authToken=TOKEN URL is passed directly — Turso's
     // client parses the host and auth token from the query string.
@@ -119,7 +79,7 @@ function createPrismaClient(): PrismaClient {
     return new PrismaClient({ adapter });
   }
 
-  // ── Local dev path: SQLite file ─────────────────────────────────────────────
+  // ── Local dev / CI path: SQLite file ───────────────────────────────────────
   // datasourceUrl overrides the URL in schema.prisma at runtime.
   // Prisma's built-in SQLite engine (a Rust binary) reads the file directly.
   return new PrismaClient({ datasourceUrl: url });

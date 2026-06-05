@@ -4,36 +4,39 @@
 //   1. Authentication: is there a valid session? (user is logged in)
 //   2. Authorisation:  does session.user.role === "ADMIN"? (user has the right role)
 //
-// Authentication = "Who are you?"  → verifying identity
+// Authentication = "Who are you?"   → verifying identity
 // Authorisation  = "Are you allowed?" → verifying permission
 //
 // Both checks happen here, before the page component ever runs.
 // middleware.ts is the server's front door.
+//
+// WHY "@repo/auth/middleware" NOT "@repo/auth"?
+//   "@repo/auth" (index.ts) imports the Prisma adapter and bcrypt — Node.js-only
+//   packages that crash in Edge Runtime with "Dynamic Code Evaluation not allowed".
+//   "@repo/auth/middleware" (packages/auth/src/middleware.ts) only imports the
+//   edge-safe JWT config, which NextAuth uses to verify the cookie without touching
+//   the database.  Role information is stored IN the JWT token, so no DB query is
+//   needed to check if the user is an ADMIN.
 
-import { auth } from "@repo/auth";
-import { NextResponse } from "next/server";
+import { auth }          from "@repo/auth/middleware";
+import { NextResponse }  from "next/server";
 import type { NextMiddleware } from "next/server";
 
-// auth(callback) wraps our middleware with NextAuth's session-injection logic.
-// Before our callback runs, NextAuth reads the session cookie and attaches
-// the session to req.auth. If the cookie is invalid or expired, req.auth is null.
-//
-// `as unknown as NextMiddleware` is needed because `auth(callback)` returns
-// an internal NextAuth type that references un-exported types. Casting to
-// NextMiddleware (the standard Next.js middleware type) tells TypeScript
-// the export is valid — the runtime behaviour is identical.
+// auth(callback) wraps our function with NextAuth's session-injection logic.
+// Before our callback runs, NextAuth decrypts the JWT cookie and attaches
+// the session to req.auth.  If the cookie is invalid or missing, req.auth is null.
 export default auth(function middleware(req) {
-  // req.auth is injected by the auth() wrapper — it's the session or null.
+  // req.auth is the decrypted JWT payload — it is the session or null.
   const session = req.auth as { user?: { role?: string } } | null;
   const { pathname } = req.nextUrl;
 
-  // /login is always public — never redirect someone who is already on /login
+  // /login is always public — never redirect someone already on /login
   // (that would cause an infinite redirect loop).
   if (pathname === "/login") return NextResponse.next();
 
   // ── Check 1: is the user logged in? ──────────────────────────────────────
   if (!session) {
-    // Build /login?callbackUrl=/products so after login, they land back here.
+    // Build /login?callbackUrl=/products so after login they land back here.
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);

@@ -8,26 +8,25 @@
 //   /checkout → checkout/page.tsx (server component) calls auth() + redirect()
 //   /orders   → orders/page.tsx (server component) calls auth() + redirect()
 //
-// Why page-level protection instead of middleware?
-//   NextAuth's `authorized` callback in middleware requires Edge-compatible
-//   code. Our auth config imports Prisma (Node.js-only), so the authorized
-//   callback cannot be used safely in Edge Runtime without a separate
-//   edge-compatible auth config. Page-level auth() runs in Node.js runtime
-//   and has no such restriction.
+// WHY PAGE-LEVEL PROTECTION INSTEAD OF MIDDLEWARE?
+//   NextAuth's `authorized` callback in middleware needs to run in Edge Runtime.
+//   The full auth config (index.ts) imports Prisma and @libsql/client — Node.js-only
+//   packages — so it cannot run in Edge Runtime. The edge-safe config exported by
+//   "@repo/auth/middleware" can only verify the JWT; it cannot call the database.
+//   Page-level auth() runs in Node.js runtime (server components) and has no such
+//   restriction, so we do the actual DB-backed checks there.
 //
-// The matcher still ensures the middleware runs on these paths so the session
-// data is available to the page components via the request context.
+// WHY "@repo/auth/middleware" NOT "@repo/auth"?
+//   "@repo/auth" (packages/auth/src/index.ts) imports the Prisma adapter and
+//   bcrypt — both pull in Node.js-only packages that crash in Edge Runtime.
+//   "@repo/auth/middleware" (packages/auth/src/middleware.ts) only imports the
+//   JWT config (config.ts), which is safe to run in Edge Runtime.
 
-export { auth as default } from "@repo/auth";
+export { auth as default } from "@repo/auth/middleware";
 
 // config.matcher: which URL paths trigger this middleware.
-// The patterns below match:
-//   /cart           → the cart page
-//   /cart/anything  → any sub-path of cart
-//   /checkout       → checkout page
-//   /orders         → order history page
-// All other paths are NOT matched, so middleware never runs on the home page,
-// /login, /register, or API routes.
+// We only match pages that need the session in their server component —
+// the middleware stamps req.auth so the page can call auth() cheaply.
 export const config = {
   matcher: [
     "/cart/:path*",

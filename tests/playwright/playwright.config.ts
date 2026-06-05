@@ -150,17 +150,6 @@ export default defineConfig({
         AUTH_TRUST_HOST:  "true",
         AUTH_SECRET:      "e2e-test-secret-soundwave-32chars",
         AUTH_COOKIE_NAME: "store.session-token",
-        // Pass Stripe keys from the environment if present (set as GitHub secrets on CI).
-        // Locally, Next.js also loads .env.local which has these keys.
-        ...(process.env["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"] && {
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"],
-        }),
-        ...(process.env["STRIPE_SECRET_KEY"] && {
-          STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"],
-        }),
-        ...(process.env["STRIPE_WEBHOOK_SECRET"] && {
-          STRIPE_WEBHOOK_SECRET: process.env["STRIPE_WEBHOOK_SECRET"],
-        }),
       },
       // On CI, always start a fresh server. Locally, reuse if already running on
       // the TEST port (3002) — safe because dev runs on 3000, not 3002.

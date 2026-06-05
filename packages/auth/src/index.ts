@@ -1,64 +1,53 @@
-// index.ts — shared NextAuth.js v5 configuration used by both apps.
+// index.ts — full NextAuth.js v5 configuration (Node.js only).
 //
-// Both apps re-export the handlers via their own /api/auth/[...nextauth]/route.ts.
-// This single file is the ONE place to change auth logic.
+// ⚠  DO NOT import this file from Next.js Middleware (middleware.ts).
+//    It pulls in @repo/db/client which uses Prisma + @libsql/client — both are
+//    Node.js-only and cannot run in Edge Runtime.
+//    Middleware should import from "@repo/auth/middleware" instead.
 //
-// SESSION STRATEGY CHANGE (from database → jwt):
-//   Auth.js v5 enforces that the Credentials provider ONLY works with JWT sessions.
-//   With an OAuth provider (Google, GitHub), the adapter creates a User row on first login
-//   and links sessions to that row via the Session table.
-//   With Credentials, the user already exists (registered via /api/auth/register) and
-//   Auth.js has no standard way to link the Credentials response to an adapter User row
-//   without the JWT intermediary — so it throws UnsupportedStrategy.
+// ─── HOW THE SPLIT CONFIG WORKS ──────────────────────────────────────────────
 //
-//   JWT sessions: the session cookie holds a signed+encrypted JSON token.
-//     ✓ Works with Credentials provider
-//     ✓ No DB query on every request (session data is in the cookie)
-//     ✗ Cannot be revoked without a token blocklist
-//   Database sessions: the cookie holds an opaque token; session row is in DB.
-//     ✓ Revocable (delete the Session row)
-//     ✗ Incompatible with Credentials provider in Auth.js v5
+//   config.ts (edge-safe)  — JWT callbacks, pages, cookie settings.
+//                            No DB or native addon imports.
+//                            Used by middleware via "@repo/auth/middleware".
 //
-// How JWT callbacks work:
-//   authorize()  →  jwt({ token, user })  →  session({ session, token })
-//   The jwt callback runs first and puts data INTO the token.
-//   The session callback runs second and shapes what pages/hooks see.
+//   index.ts (this file)   — Extends authConfig with the Prisma adapter
+//                            (user lookup for OAuth) and the Credentials provider
+//                            (email + bcrypt password login).
+//                            Used by API routes (/api/auth/[...nextauth]) and
+//                            Server Components (auth() calls in page.tsx files).
+//
+// ─── SESSION STRATEGY ────────────────────────────────────────────────────────
+//
+//   Auth.js v5 requires jwt strategy when using the Credentials provider.
+//   With database sessions, Auth.js would need to link the Credentials result to
+//   an adapter session row — it has no standard mechanism for this and throws
+//   UnsupportedStrategy. JWT sessions store identity in an encrypted cookie so
+//   no database lookup is needed per request.
+//
+//   jwt   — session lives in a signed + encrypted cookie; fast, no DB per request;
+//            cannot be revoked without a token blocklist.
+//   db    — session row is in the database; revocable; incompatible with Credentials.
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcryptjs from "bcryptjs";
 import { db } from "@repo/db/client";
+import { authConfig } from "./config";
 
-// ─── Module augmentation ──────────────────────────────────────────────────────
-// Extend NextAuth's built-in types so pages see .id and .role without casting.
-
-declare module "next-auth" {
-  interface User {
-    role?: string;
-  }
-  interface Session {
-    user: {
-      id:     string;
-      role:   string;
-      name:   string;
-      email:  string;
-      image?: string | null;
-    };
-  }
-}
-
-// ─── NextAuth initialisation ──────────────────────────────────────────────────
+// Re-export the module augmentation so any file that imports from "@repo/auth"
+// also sees the extended Session / User types without a separate import.
+export type {} from "./config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Spread the edge-safe config (JWT strategy, callbacks, pages, cookie name).
+  // We add only the Node.js-only pieces below.
+  ...authConfig,
 
-  // The Prisma adapter is kept so OAuth providers (added later) still work
-  // and so the Account table is populated correctly.
+  // PrismaAdapter keeps the Account table in sync for OAuth providers added later.
+  // It is NOT used for Credentials login — that goes through authorize() below.
   adapter: PrismaAdapter(db),
-
-  // JWT strategy: session data lives in an encrypted cookie, no DB lookup per request.
-  // Required when using the Credentials provider with Auth.js v5.
-  session: { strategy: "jwt" },
 
   providers: [
     Credentials({
@@ -68,7 +57,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
 
       // authorize() runs server-side on every login attempt.
-      // Returns the user object (success) or null (wrong credentials).
+      // Returns the user object on success, null on wrong credentials.
       async authorize(credentials): Promise<{ id: string; email: string; name: string; role: string } | null> {
         const email    = credentials?.email    as string | undefined;
         const password = credentials?.password as string | undefined;
@@ -86,53 +75,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-
-  callbacks: {
-    // jwt() — runs when a token is CREATED (sign-in) and every time it's READ.
-    // `user` is only populated on the first call (the sign-in), so we use it
-    // to put id and role into the token. Subsequent calls just pass the token through.
-    async jwt({ token, user }) {
-      if (user) {
-        // user is the object returned by authorize() above.
-        token.id   = user.id;
-        token.role = (user as { role?: string }).role ?? "USER";
-      }
-      return token;
-    },
-
-    // session() — runs when auth() or useSession() is called.
-    // With JWT strategy, `token` is the JWT payload (from the jwt callback above).
-    // We copy id and role from the token into session.user so pages can read them.
-    session({ session, token }) {
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id:   token.id   as string,
-          role: token.role as string ?? "USER",
-        },
-      };
-    },
-  },
-
-  pages: { signIn: "/login" },
-
-  // Give each app its own session cookie name so they don't share sessions on localhost.
-  // On localhost, cookies are scoped by domain only (not port) — without this, logging
-  // into admin (:3001) also logs you into the store (:3000) because both share "localhost".
-  // In production (separate domains) this is not needed, but it's harmless to keep.
-  // Each app sets AUTH_COOKIE_NAME in its own .env.local.
-  ...(process.env.AUTH_COOKIE_NAME && {
-    cookies: {
-      sessionToken: {
-        name: process.env.AUTH_COOKIE_NAME,
-        options: {
-          httpOnly: true,
-          sameSite: "lax",
-          path:     "/",
-          secure:   process.env.NODE_ENV === "production",
-        },
-      },
-    },
-  }),
 });
