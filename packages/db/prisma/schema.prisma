@@ -4,7 +4,12 @@
 //   2. SQL migration files (packages/db/prisma/migrations/)
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // previewFeatures = ["driverAdapters"] unlocks Prisma's "driver adapter" API,
+  // which lets us plug in @libsql/client (Turso's HTTP client) instead of
+  // Prisma's built-in SQLite file engine.  Without this flag the PrismaClient
+  // constructor rejects the { adapter: ... } option at runtime.
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

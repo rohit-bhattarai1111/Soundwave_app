@@ -7,7 +7,8 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "dev:test": "turbo run dev:test"
+    "dev:test": "turbo run dev:test",
+    "postinstall": "pnpm --filter @repo/db exec prisma generate"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
