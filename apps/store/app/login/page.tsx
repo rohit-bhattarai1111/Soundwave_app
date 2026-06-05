@@ -2,18 +2,14 @@
 
 // login/page.tsx — store login form, wired to the real database via NextAuth.
 //
-// Auth.js v5 (beta.31) sign-in strategy:
-//   We call signIn WITHOUT redirect: false so Auth.js owns the redirect fully:
-//     - Valid credentials  → Auth.js redirects the browser to "/" (or callbackUrl).
-//     - Wrong credentials  → Auth.js redirects to /login?error=CredentialsSignin.
-//   The useEffect at mount reads ?error from the URL and shows the error message.
-//
-//   Why not redirect: false?
-//   In beta.31, signIn({ redirect: false }) with wrong credentials returns
-//   { ok: true } due to an opaque-redirect handling bug — the client can't read
-//   the redirect target URL. Using Auth.js's default redirect avoids this.
+// Auth.js v5 sign-in strategy:
+//   signIn({ redirect: false }) POSTs credentials and returns { ok } in JS.
+//   On success we router.push() to the callback URL; on failure we show an inline error.
+//   This matches the admin login page and avoids MissingCSRF in E2E/CI, where the
+//   full-page redirect flow can fail before the CSRF cookie is established.
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
@@ -30,6 +26,7 @@ interface LoginErrors {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
+  const router = useRouter();
   const [fields,      setFields]      = useState({ email: "", password: "" });
   const [errors,      setErrors]      = useState<LoginErrors>({});
   // serverError shows a message for wrong credentials (no field-level detail on
@@ -67,20 +64,21 @@ export default function LoginPage() {
     setLoading(true);
     setServerError(null);
 
-    // signIn() without redirect: false lets Auth.js handle the full redirect:
-    //   - Success → browser navigates to "/" (or callbackUrl from the URL).
-    //   - Failure → browser navigates to /login?error=CredentialsSignin.
-    // The useEffect above reads ?error on the next mount and shows the message.
     const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl") ?? "/";
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       email:    fields.email,
       password: fields.password,
-      redirectTo: callbackUrl,
+      redirect: false,
     });
 
-    // This line is only reached if signIn() returns without navigating
-    // (should not happen with default redirect behaviour, but acts as a safety net).
     setLoading(false);
+
+    if (result?.ok) {
+      router.push(callbackUrl);
+      router.refresh();
+    } else {
+      setServerError("Invalid email or password.");
+    }
   }
 
   return (
