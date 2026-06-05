@@ -13,10 +13,19 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from "bcryptjs";
-import { Prisma } from "@prisma/client";
 import { db } from "@repo/db/client";
 import { RegisterSchema } from "@/lib/validation";
 import { errorResponse, successResponse } from "@/lib/api";
+
+// Detect Prisma's unique-constraint error (P2002) without importing @prisma/client.
+// In pnpm monorepos, @prisma/client is a dep of @repo/db — importing it directly
+// here would be a "phantom dependency" that pnpm doesn't allow.
+// Duck-typing on the error code gives the same runtime behaviour.
+const isPrismaUniqueViolation = (err: unknown): boolean =>
+  typeof err === "object" &&
+  err !== null &&
+  "code" in err &&
+  (err as { code: string }).code === "P2002";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── 1. Parse the JSON body ─────────────────────────────────────────────────
@@ -80,7 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // race where two concurrent requests both pass the findUnique check above, then
     // one create succeeds and the other hits the DB constraint.
     // Return 409 (the same as the explicit check above) instead of 500.
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    if (isPrismaUniqueViolation(err)) {
       return errorResponse("An account with this email address already exists.", undefined, 409);
     }
     // Catch any other unexpected DB errors so the server doesn't crash.
