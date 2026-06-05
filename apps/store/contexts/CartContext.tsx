@@ -177,7 +177,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "CLEAR_CART" });
     }
   // Re-run when the user logs in or out (status changes) or switches accounts.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session?.user?.id]);
 
   // ── addItem ─────────────────────────────────────────────────────────────────
