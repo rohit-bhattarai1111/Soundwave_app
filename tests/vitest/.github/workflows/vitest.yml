@@ -1,0 +1,61 @@
+# vitest.yml — runs unit and component tests on every push / PR.
+#
+# Co-located with the test code (tests/vitest/) so the workflow lives
+# next to what it tests — the same pattern used by tests/playwright/.
+#
+# HOW IT'S USED:
+#   The root .github/workflows/ci.yml references this file via `workflow_call`
+#   so GitHub Actions picks it up from the repository root.
+#   Alternatively, copy this file to the repo root .github/workflows/ to run it
+#   directly.
+#
+# WHAT IT DOES:
+#   1. Install all pnpm workspace dependencies (including @soundwave/tests-vitest)
+#   2. Run `vitest run` inside the tests/vitest package
+#   This runs ALL test projects (store + admin) in one command and exits
+#   with a non-zero code if any test fails — blocking a PR merge.
+
+name: Vitest — Unit & Component Tests
+
+on:
+  workflow_call:    # called from ci.yml
+  push:
+    branches: [main, backend]
+  pull_request:
+    branches: [main]
+
+jobs:
+  vitest:
+    name: Unit & Component Tests
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Check out the full repo so vitest can resolve imports across apps/.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Install pnpm (pinned to match packageManager in root package.json).
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      # 3. Install Node 20 with pnpm store cache.
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      # 4. Install all workspace deps (including the tests/vitest package).
+      #    --frozen-lockfile ensures reproducible installs — fails if lockfile
+      #    is out of date rather than silently updating it.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 5. Run vitest in the tests/vitest package.
+      #    `--filter` targets the package by its name field in package.json.
+      #    `vitest run` exits after one pass (no watch mode) — correct for CI.
+      - name: Run Vitest
+        run: pnpm --filter @soundwave/tests-vitest test

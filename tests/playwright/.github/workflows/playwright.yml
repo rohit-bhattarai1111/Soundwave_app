@@ -1,0 +1,100 @@
+# playwright.yml — CI workflow for the @soundwave/tests-playwright package.
+#
+# This workflow is co-located with the tests it runs (same pattern as
+# tests/vitest/.github/workflows/vitest.yml). Each test package owns its
+# own workflow rather than bloating the root ci.yml.
+#
+# TRIGGER: runs on every push to main and on every pull request that targets main.
+#
+# WHAT IT DOES:
+#   1. Installs Node.js + pnpm
+#   2. Installs workspace dependencies (including @playwright/test)
+#   3. Installs the Chromium browser binary used by Playwright
+#   4. Runs `playwright test` against both apps (started by webServer in config)
+#
+# SECRETS REQUIRED (set in GitHub → Settings → Secrets → Actions):
+#   STRIPE_SECRET_KEY               — Stripe test secret key (sk_test_...)
+#   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY — Stripe test publishable key (pk_test_...)
+#   STRIPE_WEBHOOK_SECRET           — Stripe webhook signing secret (whsec_...)
+#
+# Without the Stripe secrets, checkout.spec.ts will still run but Stripe
+# Elements won't load (the checkout page shows a "Stripe not configured" warning).
+
+name: Playwright E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  playwright:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # ── 3. pnpm ──────────────────────────────────────────────────────────────
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # ── 4. Cache ─────────────────────────────────────────────────────────────
+      # Cache node_modules to speed up repeated runs.
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      # ── 5. Install dependencies ───────────────────────────────────────────────
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── 6. Prisma Client ─────────────────────────────────────────────────────
+      # Generate the Prisma Client from schema.prisma so it's available
+      # when the app servers start (they import from @repo/db/client).
+      - name: Generate Prisma Client
+        run: pnpm --filter @repo/db exec prisma generate
+
+      # ── 7. Playwright browsers ───────────────────────────────────────────────
+      # Download the Chromium binary for the current Playwright version.
+      # Only Chromium is needed (we don't run Firefox or WebKit in CI).
+      - name: Install Playwright Chromium
+        run: pnpm --filter @soundwave/tests-playwright exec playwright install chromium --with-deps
+        # --with-deps also installs OS-level browser dependencies (libglib2, etc.) on Ubuntu.
+
+      # ── 8. Run tests ─────────────────────────────────────────────────────────
+      - name: Run Playwright E2E tests
+        run: pnpm --filter @soundwave/tests-playwright test
+        env:
+          CI: "true"
+          # Stripe keys — set these as GitHub repository secrets.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+      # ── 9. Upload report ─────────────────────────────────────────────────────
+      # Always upload the HTML report even on failure — lets you inspect
+      # screenshots and traces for failing tests.
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/playwright/playwright-report/
+          retention-days: 14

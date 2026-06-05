@@ -1,0 +1,22 @@
+{
+  // tsconfig.json for @soundwave/tests-playwright.
+  //
+  // Playwright uses its own built-in esbuild transform, so TypeScript is
+  // transpiled at test runtime — you don't need to run tsc manually.
+  // This tsconfig is used by your IDE for type checking and IntelliSense only.
+  "compilerOptions": {
+    "target":            "ESNext",
+    "lib":               ["ESNext", "DOM"],
+    "module":            "ESNext",
+    "moduleResolution":  "Bundler",
+    "strict":            true,
+    "skipLibCheck":      true,
+    // Playwright's types (test, expect, Page, etc.) are available globally
+    // once @playwright/test is installed — no import needed in test files.
+    // "node" enables type-checking for node: imports (path, fs, url, child_process).
+    "types":             ["@playwright/test", "node"]
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}
