@@ -12,6 +12,10 @@ const nextConfig = {
       },
     ],
   },
+
+  // Same as apps/store — prevent webpack from bundling Node-only libsql packages.
+  // See apps/store/next.config.js for the full explanation.
+  serverExternalPackages: ["@libsql/client", "@prisma/adapter-libsql"],
 };
 
 export default nextConfig;

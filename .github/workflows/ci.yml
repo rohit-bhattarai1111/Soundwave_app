@@ -97,8 +97,13 @@ jobs:
       #    visible in the CI log and to ensure it uses the right schema path.
       #    No database connection is needed — this only reads the schema file
       #    and writes TypeScript types into node_modules/@prisma/client.
+      #
+      #    WHY pnpm --filter instead of npx prisma?
+      #    `npx prisma` resolves to the LATEST prisma on npm (currently v7),
+      #    which has breaking schema changes. We must use the version installed
+      #    in the workspace (5.22.x) by routing through pnpm's binary resolution.
       - name: Generate Prisma Client
-        run: npx prisma generate --schema=packages/db/prisma/schema.prisma
+        run: pnpm --filter @repo/db exec prisma generate
 
       # 6. Apply migrations to create the test database file.
       #    `migrate deploy` reads every file in packages/db/prisma/migrations/
@@ -107,16 +112,15 @@ jobs:
       #    creates it and runs the CREATE TABLE statements from migration.sql.
       #    This command is safe and idempotent: it skips already-applied migrations.
       - name: Run database migrations
-        run: npx prisma migrate deploy --schema=packages/db/prisma/schema.prisma
+        run: pnpm --filter @repo/db exec prisma migrate deploy
 
       # 7. Seed the database with initial data.
-      #    seed.ts inserts 12 albums and 2 users (admin + test user) using upsert,
-      #    so it is safe to re-run without creating duplicates.
-      #    We run it from packages/db/ so relative imports (./client, ./data)
-      #    resolve correctly. DATABASE_URL is inherited from the job env block,
-      #    so the seed writes into the same test.db that migrate created above.
+      #    `pnpm --filter @repo/db run db:seed` runs `prisma db seed` from
+      #    packages/db/, which loads packages/db/.env then calls tsx src/seed.ts.
+      #    DATABASE_URL from the job env block overrides the .env file value,
+      #    so the seed writes to test.db (file:) not the Turso production DB.
       - name: Seed database
-        run: cd packages/db && npx tsx src/seed.ts
+        run: pnpm --filter @repo/db run db:seed
 
       # 8. Build both Next.js apps via Turborepo.
       #    `pnpm run build` → root package.json script → `turbo run build`
