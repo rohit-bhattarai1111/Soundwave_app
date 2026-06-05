@@ -1,14 +1,9 @@
 "use client";
 
-// checkout/success/page.tsx — shown after a successful Stripe payment.
+// checkout/success/page.tsx — shown after a successful mock checkout.
 //
 // The checkout page stores a summary in sessionStorage before navigating here.
 // We read it once (on mount) and clear it so refreshing the page shows a clean state.
-//
-// Note on card details: Stripe Elements processes card data inside an iframe —
-// card numbers never reach our JavaScript. We therefore don't show "charged to
-// card ending in ..." here (we don't have that data). The order status in the DB
-// updates to PAID when the Stripe webhook fires (asynchronously after this page loads).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -124,20 +119,9 @@ export default function CheckoutSuccessPage() {
               </div>
             </div>
 
-            {/* Payment processed note — replaces the old "card ending in ..." display.
-                Card details never reach our server when using Stripe Elements. */}
             <div className="border-t border-gray-100 px-5 py-4">
               <p className="text-sm text-gray-500">
-                Payment securely processed by{" "}
-                <a
-                  href="https://stripe.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-gray-700 hover:text-indigo-600"
-                >
-                  Stripe
-                </a>
-                . Your order history is available in{" "}
+                Your order is confirmed. View it any time in{" "}
                 <Link href="/orders" className="font-medium text-indigo-600 hover:text-indigo-700">
                   My Orders
                 </Link>

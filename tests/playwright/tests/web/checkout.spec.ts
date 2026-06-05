@@ -1,24 +1,18 @@
-// checkout.spec.ts — E2E tests for the Stripe checkout flow.
+// checkout.spec.ts — E2E tests for the mock checkout flow.
 //
 // COVERAGE:
-//   - Full happy path: add item → fill card details → pay → success page.
+//   - Full happy path: add item → fill mock card form → pay → success page.
 //   - Success page: shows correct heading and navigation links.
 //   - Empty cart guard: navigating to /checkout with no items shows "Nothing to check out".
 //   - Route protection: unauthenticated users are redirected to /login.
 //
-// HOW STRIPE TEST MODE WORKS:
-//   Card 4242 4242 4242 4242 always succeeds in Stripe test mode. No real charge.
-//
-// STRIPE IFRAME:
-//   Stripe's CardElement renders inside a sandboxed <iframe> for PCI compliance.
-//   Playwright uses frameLocator() to cross the iframe boundary.
-//   WHY pressSequentially() not fill()?
-//     Stripe validates on each keystroke. fill() writes atomically and skips key
-//     events — the card number won't format correctly and validation won't fire.
+// MOCK CHECKOUT:
+//   The form accepts any 16-digit card number, any valid MM/YY expiry, and any
+//   3–4-digit CVV. No real payment is processed — the server just creates the
+//   order as PAID immediately.
 //
 // PREREQUISITES:
-//   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY must be set.
-//   Locally: in apps/store/.env.local. On CI: as GitHub secrets.
+//   No environment secrets required. The E2E database is seeded by global-setup.ts.
 
 import { test, expect, type Page } from "@playwright/test";
 import path                          from "node:path";
@@ -29,6 +23,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USER_AUTH = path.join(__dirname, "../../.auth/user.json");
 
 // ── Cart-clear helper ──────────────────────────────────────────────────────────
+// DELETE /api/cart removes all cart items for the authenticated user, giving
+// each test a clean starting state regardless of what previous tests left behind.
 async function clearCart(page: Page) {
   await page.request.delete("http://localhost:3002/api/cart").catch(() => {});
 }
@@ -37,6 +33,9 @@ async function clearCart(page: Page) {
 // Navigates to home, waits for auth and CartContext hydration to complete, then
 // adds the first product. Returns when the POST /api/cart is done (item in DB).
 async function addItemToCart(page: Page) {
+  // Wait for the GET /api/cart that fires on page load — CartContext uses this
+  // to rehydrate from the DB. Without waiting, clicking "Add to Cart" may fire
+  // before hydration completes and the optimistic update gets lost.
   const cartHydrated = page.waitForResponse(
     (resp) => resp.url().includes("/api/cart") && resp.request().method() === "GET",
     { timeout: 15_000 }
@@ -46,6 +45,7 @@ async function addItemToCart(page: Page) {
   await page.getByRole("button", { name: "Logout" }).waitFor({ timeout: 10_000 });
   await cartHydrated;
 
+  // Click "Add to Cart" and wait for the POST to complete before returning.
   await Promise.all([
     page.waitForResponse(
       (resp) => resp.url().includes("/api/cart") && resp.request().method() === "POST",
@@ -53,6 +53,15 @@ async function addItemToCart(page: Page) {
     ),
     page.getByRole("button", { name: "Add to Cart" }).first().click(),
   ]);
+}
+
+// ── Mock card form helper ──────────────────────────────────────────────────────
+// Fills every field in the mock payment form with valid dummy values.
+async function fillMockCardForm(page: Page) {
+  await page.getByLabel("Name on card").fill("E2E Test User");
+  await page.getByLabel("Card number").fill("1234567890123456");
+  await page.getByLabel("Expiry").fill("12 / 26");
+  await page.getByLabel("CVV").fill("123");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,32 +74,21 @@ test.describe("Checkout (authenticated)", () => {
     await clearCart(page);
   });
 
-  test("completes checkout with Stripe test card and sees the success page", async ({ page }) => {
+  test("completes mock checkout and sees the success page", async ({ page }) => {
     await addItemToCart(page);
 
-    // Navigate to checkout.
+    // Navigate to the checkout page.
     await page.goto("/checkout");
     await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
 
-    // Fill "Name on card" — a regular input (not in the Stripe iframe).
-    await page.getByLabel("Name on card").fill("E2E Test User");
+    // Fill the mock card form — all plain <input> elements, no iframe.
+    await fillMockCardForm(page);
 
-    // Stripe iframe — identified by its stable title attribute.
-    const stripeFrame = page.frameLocator("iframe[title='Secure card payment input frame']");
-
-    // pressSequentially() triggers Stripe's per-keystroke event handlers so
-    // the number formats correctly and validation fires.
-    await stripeFrame.getByPlaceholder("Card number").pressSequentially("4242424242424242");
-    await stripeFrame.getByPlaceholder("MM / YY").pressSequentially("1234");
-    await stripeFrame.getByPlaceholder("CVC").pressSequentially("123");
-    // ZIP is the 4th required field — omitting it causes "postal code is incomplete".
-    await stripeFrame.getByLabel("ZIP").pressSequentially("12345");
-
-    // The Pay button text is "Pay $X.XX" — regex matches any dollar amount.
+    // Click "Pay $X.XX" — regex matches any dollar amount.
     await page.getByRole("button", { name: /^Pay \$/ }).click();
 
-    // Stripe processes the payment and the checkout page navigates to /checkout/success.
-    await page.waitForURL("/checkout/success", { timeout: 30_000 });
+    // The server creates the order and the client navigates to /checkout/success.
+    await page.waitForURL("/checkout/success", { timeout: 15_000 });
     await expect(
       page.getByRole("heading", { name: "Payment Successful!" })
     ).toBeVisible();
@@ -100,17 +98,10 @@ test.describe("Checkout (authenticated)", () => {
     await addItemToCart(page);
     await page.goto("/checkout");
     await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
-    await page.getByLabel("Name on card").fill("E2E Test User");
-
-    const stripeFrame = page.frameLocator("iframe[title='Secure card payment input frame']");
-    await stripeFrame.getByPlaceholder("Card number").pressSequentially("4242424242424242");
-    await stripeFrame.getByPlaceholder("MM / YY").pressSequentially("1234");
-    await stripeFrame.getByPlaceholder("CVC").pressSequentially("123");
-    await stripeFrame.getByLabel("ZIP").pressSequentially("12345");
+    await fillMockCardForm(page);
     await page.getByRole("button", { name: /^Pay \$/ }).click();
-    await page.waitForURL("/checkout/success", { timeout: 30_000 });
+    await page.waitForURL("/checkout/success", { timeout: 15_000 });
 
-    // The success page has a "Continue Shopping" link to the store home.
     const continueLink = page.getByRole("link", { name: "Continue Shopping" });
     await expect(continueLink).toBeVisible();
     await expect(continueLink).toHaveAttribute("href", "/");
@@ -120,24 +111,16 @@ test.describe("Checkout (authenticated)", () => {
     await addItemToCart(page);
     await page.goto("/checkout");
     await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
-    await page.getByLabel("Name on card").fill("E2E Test User");
-
-    const stripeFrame = page.frameLocator("iframe[title='Secure card payment input frame']");
-    await stripeFrame.getByPlaceholder("Card number").pressSequentially("4242424242424242");
-    await stripeFrame.getByPlaceholder("MM / YY").pressSequentially("1234");
-    await stripeFrame.getByPlaceholder("CVC").pressSequentially("123");
-    await stripeFrame.getByLabel("ZIP").pressSequentially("12345");
+    await fillMockCardForm(page);
     await page.getByRole("button", { name: /^Pay \$/ }).click();
-    await page.waitForURL("/checkout/success", { timeout: 30_000 });
+    await page.waitForURL("/checkout/success", { timeout: 15_000 });
 
-    // The success page also links to the order history page.
     await expect(page.getByRole("link", { name: "View order history" })).toBeVisible();
   });
 
   test("navigating to /checkout with an empty cart shows 'Nothing to check out'", async ({ page }) => {
     // Cart is already cleared by beforeEach.
-    // Navigate to checkout — CartContext hydrates with empty list.
-    // The CheckoutPage empty-guard renders before initialising Stripe.
+    // CartContext hydrates from GET /api/cart on page load — wait for it.
     const cartHydrated = page.waitForResponse(
       (resp) => resp.url().includes("/api/cart") && resp.request().method() === "GET",
       { timeout: 15_000 }
@@ -146,8 +129,25 @@ test.describe("Checkout (authenticated)", () => {
     await cartHydrated;
 
     await expect(page.getByText("Nothing to check out")).toBeVisible({ timeout: 10_000 });
-    // A "Back to Store" link is also rendered in the empty-cart guard.
     await expect(page.getByRole("link", { name: "Back to Store" })).toBeVisible();
+  });
+
+  test("shows validation errors when form is submitted empty", async ({ page }) => {
+    await addItemToCart(page);
+    await page.goto("/checkout");
+    await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
+
+    // Submit without filling any fields.
+    await page.getByRole("button", { name: /^Pay \$/ }).click();
+
+    // Each required field should show its error message.
+    await expect(page.getByText("Name on card is required.")).toBeVisible();
+    await expect(page.getByText("Enter a valid 16-digit card number.")).toBeVisible();
+    await expect(page.getByText("Enter expiry as MM / YY.")).toBeVisible();
+    await expect(page.getByText("Enter a 3 or 4-digit CVV.")).toBeVisible();
+
+    // Page must NOT navigate away — user stays on checkout.
+    await expect(page).toHaveURL(/\/checkout$/);
   });
 
 });

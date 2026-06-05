@@ -1,172 +1,145 @@
 "use client";
 
-// CheckoutPageClient.tsx — Stripe payment form (client component).
+// CheckoutPageClient.tsx — mock payment form (client component).
 // Rendered by checkout/page.tsx after the server-side auth check passes.
 //
-// Architecture:
-//   CheckoutPageClient (outer)
-//     ↓ renders
-//   <Elements> (Stripe provider — initialises Stripe.js in the browser)
-//     ↓ renders
-//   <PaymentForm> (inner — uses useStripe() + useElements() hooks)
+// MOCK CHECKOUT DESIGN:
+//   This is a simulated payment form with no real payment processor.
+//   The form collects card-looking fields (name, number, expiry, CVV) purely for
+//   the UI experience. None of these values are validated against a real bank.
 //
-// Why the two-component split?
-//   useStripe() and useElements() must be used inside a component that is a
-//   *child* of <Elements>. They can't be called in the same component that
-//   renders <Elements>. The split is a React context requirement from the SDK.
-//
-// Payment flow:
-//   1. User clicks "Pay $X" — handleSubmit fires
-//   2. POST /api/checkout → Prisma transaction (order, items, stock, cart) + Stripe PaymentIntent
-//   3. stripe.confirmCardPayment(clientSecret) → Stripe handles the card charge
-//   4. On success → clear local cart state → navigate to /checkout/success
-//   5. Later: Stripe sends webhook → order status set to PAID
+// PAYMENT FLOW:
+//   1. User fills the form and clicks "Pay $X"
+//   2. POST /api/checkout → Prisma transaction:
+//        create Order (PAID) + OrderItems + decrement stock + clear DB cart
+//   3. On success → clear local CartContext state → navigate to /checkout/success
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
-import { Navbar } from "@/components/Navbar";
+import { useState }    from "react";
+import { useRouter }   from "next/navigation";
+import Link            from "next/link";
+import { Navbar }      from "@/components/Navbar";
 import { useCart, type CartAction } from "@/contexts/CartContext";
 import type { Dispatch } from "react";
-
-// ─── Stripe initialisation ────────────────────────────────────────────────────
-// loadStripe MUST be called at module level (outside any component) to prevent
-// the Stripe.js script from being reloaded on every render.
-// NEXT_PUBLIC_ prefix makes this env var available in the browser bundle.
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  : null;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GST_RATE = 0.1; // 10% Australian GST
 
-// ─── CardElement styling ──────────────────────────────────────────────────────
-// Stripe renders CardElement in an iframe — we can't use Tailwind classes inside it.
-// These are Stripe's own style tokens, passed as options.
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      fontSize:           "14px",
-      color:              "#111827",   // gray-900
-      fontFamily:         "ui-sans-serif, system-ui, sans-serif",
-      "::placeholder":    { color: "#9ca3af" }, // gray-400
-    },
-    invalid: {
-      color:   "#ef4444",  // red-500
-      iconColor: "#ef4444",
-    },
-  },
-};
-
-// ─── Inner payment form (must be inside <Elements>) ───────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PaymentFormProps {
-  items:     { id: string; title: string; artist: string; price: number; quantity: number }[];
-  subtotal:  number;
-  gst:       number;
-  total:     number;
-  dispatch:  Dispatch<CartAction>;
+  items:    { id: string; title: string; artist: string; price: number; quantity: number }[];
+  subtotal: number;
+  gst:      number;
+  total:    number;
+  dispatch: Dispatch<CartAction>;
 }
 
-function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps) {
-  const router   = useRouter();
-  // useStripe() and useElements() only work inside <Elements> — that's why
-  // PaymentForm is a separate child component.
-  const stripe   = useStripe();
-  const elements = useElements();
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Format a raw digit string as "1234 5678 9012 3456" while the user types.
+function formatCardNumber(raw: string): string {
+  // Strip non-digits, cap at 16, then insert a space every 4 digits.
+  return raw.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
+}
+
+// Format expiry as "MM / YY" while the user types.
+function formatExpiry(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
+}
+
+// ─── Payment form ─────────────────────────────────────────────────────────────
+
+function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps) {
+  const router = useRouter();
+
+  // Form field state
   const [nameOnCard,  setNameOnCard]  = useState("");
-  const [nameError,   setNameError]   = useState("");
-  const [stripeError, setStripeError] = useState("");
+  const [cardNumber,  setCardNumber]  = useState("");
+  const [expiry,      setExpiry]      = useState("");
+  const [cvv,         setCvv]         = useState("");
+
+  // Error state — one string per field (empty string = no error)
+  const [errors,      setErrors]      = useState({ name: "", card: "", expiry: "", cvv: "" });
+  const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ── Validation ──────────────────────────────────────────────────────────────
+  // Runs on submit. Returns true if every field is valid.
+  function validate(): boolean {
+    const next = { name: "", card: "", expiry: "", cvv: "" };
+    let valid = true;
+
+    if (nameOnCard.trim().length === 0) {
+      next.name = "Name on card is required.";
+      valid = false;
+    }
+
+    // Card number: strip spaces, must be 16 digits.
+    const rawCard = cardNumber.replace(/\s/g, "");
+    if (rawCard.length !== 16 || !/^\d+$/.test(rawCard)) {
+      next.card = "Enter a valid 16-digit card number.";
+      valid = false;
+    }
+
+    // Expiry: must be MM / YY with a valid month (01–12).
+    const rawExpiry = expiry.replace(/\s/g, "").replace("/", "");
+    if (rawExpiry.length !== 4) {
+      next.expiry = "Enter expiry as MM / YY.";
+      valid = false;
+    } else {
+      const month = parseInt(rawExpiry.slice(0, 2), 10);
+      if (month < 1 || month > 12) {
+        next.expiry = "Month must be between 01 and 12.";
+        valid = false;
+      }
+    }
+
+    // CVV: 3 or 4 digits.
+    if (!/^\d{3,4}$/.test(cvv)) {
+      next.cvv = "Enter a 3 or 4-digit CVV.";
+      valid = false;
+    }
+
+    setErrors(next);
+    return valid;
+  }
+
+  // ── Submit handler ──────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setSubmitError("");
 
-    // Basic validation before calling Stripe
-    if (nameOnCard.trim().length === 0) {
-      setNameError("Name on card is required.");
-      return;
-    }
-    if (!stripe || !elements) {
-      // Stripe.js hasn't loaded yet (slow network) — shouldn't normally happen
-      setStripeError("Stripe is not ready. Please wait a moment.");
-      return;
-    }
-
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      setStripeError("Card field not found.");
-      return;
-    }
+    if (!validate()) return;
 
     setIsSubmitting(true);
-    setStripeError("");
-
-    // ── Step 1: POST /api/checkout ──────────────────────────────────────────
-    // Server creates: Order (PENDING) + OrderItems + decrements stock + clears DB cart
-    // Then creates a Stripe PaymentIntent and returns { clientSecret, orderId }
-    let clientSecret: string;
-    let orderId: string;
 
     try {
-      const res = await fetch("/api/checkout", { method: "POST" });
-      const data = await res.json() as { clientSecret?: string; orderId?: string; error?: string };
+      // POST /api/checkout — the server creates the order as PAID, decrements
+      // stock, and clears the DB cart. We don't send card details to the server;
+      // this is a mock, so the form values are purely cosmetic.
+      const res  = await fetch("/api/checkout", { method: "POST" });
+      const data = await res.json() as { orderId?: string; error?: string };
 
-      if (!res.ok || !data.clientSecret || !data.orderId) {
-        setStripeError(data.error ?? "Checkout failed. Please try again.");
+      if (!res.ok || !data.orderId) {
+        setSubmitError(data.error ?? "Checkout failed. Please try again.");
         setIsSubmitting(false);
         return;
       }
 
-      clientSecret = data.clientSecret;
-      orderId      = data.orderId;
-
-    } catch {
-      setStripeError("Network error. Please check your connection.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // ── Step 2: stripe.confirmCardPayment ───────────────────────────────────
-    // This sends the card details to Stripe's servers (NOT to our server).
-    // The CardElement is an iframe — card numbers never touch our code.
-    // Stripe validates the card, charges it, and returns success or an error.
-    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: cardElement,
-        billing_details: { name: nameOnCard },
-      },
-    });
-
-    if (error) {
-      // Stripe declined the card or the user cancelled 3D Secure, etc.
-      setStripeError(error.message ?? "Payment failed. Please try again.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (paymentIntent?.status === "succeeded") {
-      // ── Step 3: clear local cart + navigate to success ────────────────────
-      // The DB cart was already cleared by POST /api/checkout (Step 1).
-      // dispatch CLEAR_CART clears the in-memory CartContext state.
-      // We use raw dispatch here instead of clearCart() to avoid a redundant
-      // DELETE /api/cart request (the DB is already empty).
+      // Clear the in-memory CartContext — the DB cart was already cleared by
+      // the server. We use raw dispatch to skip the redundant DELETE /api/cart
+      // request (the server already ran DELETE CartItem WHERE userId = ...).
       dispatch({ type: "CLEAR_CART" });
 
-      // Store orderId for the success page summary
+      // Persist a summary for the success page. sessionStorage is per-tab and
+      // cleared when the tab closes — no long-lived storage needed.
       sessionStorage.setItem(
         "lastOrder",
         JSON.stringify({
-          orderId,
+          orderId:  data.orderId,
           placedAt: new Date().toISOString(),
           items,
           subtotal,
@@ -176,12 +149,23 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
       );
 
       router.push("/checkout/success");
-    } else {
-      // PaymentIntent exists but status isn't succeeded yet (e.g. "requires_action").
-      // Stripe will send a webhook when it eventually resolves.
-      setStripeError("Payment is pending. We'll email you when it confirms.");
+
+    } catch {
+      setSubmitError("Network error. Please check your connection.");
       setIsSubmitting(false);
     }
+  }
+
+  // ── Field class helper ──────────────────────────────────────────────────────
+  // Returns Tailwind classes for an input field, with red border when there's an error.
+  function fieldClass(hasError: boolean): string {
+    return [
+      "w-full rounded-lg border px-4 py-2.5 text-sm transition-colors",
+      "focus:outline-none focus:ring-2",
+      hasError
+        ? "border-red-400 focus:border-red-400 focus:ring-red-100"
+        : "border-gray-200 focus:border-indigo-400 focus:ring-indigo-100",
+    ].join(" ");
   }
 
   return (
@@ -189,7 +173,7 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
       onSubmit={handleSubmit}
       className="flex flex-col gap-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
     >
-      {/* Name on card — used for billing_details */}
+      {/* ── Name on card ────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="nameOnCard" className="text-sm font-medium text-gray-700">
           Name on card
@@ -200,61 +184,98 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
           autoComplete="cc-name"
           placeholder="Alex Smith"
           value={nameOnCard}
-          onChange={(e) => { setNameOnCard(e.target.value); setNameError(""); }}
-          className={[
-            "w-full rounded-lg border px-4 py-2.5 text-sm transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-indigo-100",
-            nameError
-              ? "border-red-400 focus:border-red-400"
-              : "border-gray-200 focus:border-indigo-400",
-          ].join(" ")}
+          onChange={(e) => { setNameOnCard(e.target.value); setErrors((prev) => ({ ...prev, name: "" })); }}
+          className={fieldClass(!!errors.name)}
         />
-        {nameError && (
-          <p className="text-xs font-medium text-red-500">{nameError}</p>
-        )}
+        {errors.name && <p className="text-xs font-medium text-red-500">{errors.name}</p>}
       </div>
 
-      {/* Stripe CardElement — rendered inside an iframe by Stripe.js.
-          Card numbers are never in our JavaScript or on our servers.
-          The iframe is styled via CARD_ELEMENT_OPTIONS above. */}
+      {/* ── Card number ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-gray-700">
-          Card details
+        <label htmlFor="cardNumber" className="text-sm font-medium text-gray-700">
+          Card number
         </label>
-        <div className="rounded-lg border border-gray-200 px-4 py-3 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-colors">
-          <CardElement options={CARD_ELEMENT_OPTIONS} />
-        </div>
-        <p className="text-xs text-gray-400">
-          Test card: <span className="font-mono">4242 4242 4242 4242</span>, any future date, any 3-digit CVV
-        </p>
+        <input
+          id="cardNumber"
+          type="text"
+          inputMode="numeric"
+          autoComplete="cc-number"
+          placeholder="1234 5678 9012 3456"
+          value={cardNumber}
+          onChange={(e) => {
+            // Format as groups of 4 while the user types.
+            setCardNumber(formatCardNumber(e.target.value));
+            setErrors((prev) => ({ ...prev, card: "" }));
+          }}
+          className={fieldClass(!!errors.card)}
+        />
+        {errors.card && <p className="text-xs font-medium text-red-500">{errors.card}</p>}
       </div>
 
-      {/* Stripe or server error — shown below the card field */}
-      {stripeError && (
+      {/* ── Expiry + CVV (side by side) ──────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="expiry" className="text-sm font-medium text-gray-700">
+            Expiry
+          </label>
+          <input
+            id="expiry"
+            type="text"
+            inputMode="numeric"
+            autoComplete="cc-exp"
+            placeholder="MM / YY"
+            value={expiry}
+            onChange={(e) => {
+              setExpiry(formatExpiry(e.target.value));
+              setErrors((prev) => ({ ...prev, expiry: "" }));
+            }}
+            className={fieldClass(!!errors.expiry)}
+          />
+          {errors.expiry && <p className="text-xs font-medium text-red-500">{errors.expiry}</p>}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="cvv" className="text-sm font-medium text-gray-700">
+            CVV
+          </label>
+          <input
+            id="cvv"
+            type="text"
+            inputMode="numeric"
+            autoComplete="cc-csc"
+            placeholder="123"
+            maxLength={4}
+            value={cvv}
+            onChange={(e) => {
+              // Allow digits only, max 4 chars.
+              setCvv(e.target.value.replace(/\D/g, "").slice(0, 4));
+              setErrors((prev) => ({ ...prev, cvv: "" }));
+            }}
+            className={fieldClass(!!errors.cvv)}
+          />
+          {errors.cvv && <p className="text-xs font-medium text-red-500">{errors.cvv}</p>}
+        </div>
+      </div>
+
+      {/* ── Server / network error ───────────────────────────────────────────── */}
+      {submitError && (
         <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
-          {stripeError}
+          {submitError}
         </div>
       )}
 
+      {/* ── Submit button ────────────────────────────────────────────────────── */}
       <button
         type="submit"
-        disabled={isSubmitting || !stripe}
+        disabled={isSubmitting}
         className="mt-2 w-full rounded-full bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? "Processing…" : `Pay $${total.toFixed(2)}`}
       </button>
 
-      {/* Stripe branding — good practice (also required by Stripe's ToS for some use cases) */}
+      {/* Demo note — makes it clear this is a mock form, not real payment */}
       <p className="text-center text-xs text-gray-400">
-        Payments secured by{" "}
-        <a
-          href="https://stripe.com"
-          target="_blank"
-          rel="noreferrer"
-          className="font-medium text-gray-500 hover:text-indigo-600"
-        >
-          Stripe
-        </a>
+        Demo checkout — no real payment is taken.
       </p>
     </form>
   );
@@ -263,14 +284,15 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
 // ─── Outer page component ─────────────────────────────────────────────────────
 
 export default function CheckoutPageClient() {
-  // We need dispatch (not clearCart) in PaymentForm to skip the redundant DELETE call.
+  // We need dispatch (not clearCart) in PaymentForm to skip the redundant
+  // DELETE /api/cart request — the DB cart is already cleared by the server.
   const { state, dispatch } = useCart();
 
   const subtotal = state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const gst      = subtotal * GST_RATE;
   const total    = subtotal + gst;
 
-  // Empty cart guard — show before initialising Stripe (saves the Stripe.js network request)
+  // Empty cart guard — shown immediately without waiting for any third-party SDK.
   if (state.items.length === 0) {
     return (
       <main className="min-h-screen bg-gray-50">
@@ -298,7 +320,7 @@ export default function CheckoutPageClient() {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
 
-          {/* ── Order summary ─────────────────────────────────────────────── */}
+          {/* ── Order summary ──────────────────────────────────────────────── */}
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-gray-800">Order Summary</h2>
 
@@ -340,30 +362,16 @@ export default function CheckoutPageClient() {
             </Link>
           </div>
 
-          {/* ── Payment form ──────────────────────────────────────────────── */}
+          {/* ── Payment form ───────────────────────────────────────────────── */}
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-gray-800">Payment Details</h2>
-
-            {/* <Elements> initialises Stripe.js and provides useStripe() / useElements()
-                to all descendant components. stripePromise loads stripe.js from
-                Stripe's CDN — this is why card details never hit our server. */}
-            {stripePromise ? (
-              <Elements stripe={stripePromise}>
-                <PaymentForm
-                  items={state.items}
-                  subtotal={subtotal}
-                  gst={gst}
-                  total={total}
-                  dispatch={dispatch}
-                />
-              </Elements>
-            ) : (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-                <strong>Stripe not configured.</strong>{" "}
-                Add <code>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> to{" "}
-                <code>apps/store/.env.local</code>.
-              </div>
-            )}
+            <PaymentForm
+              items={state.items}
+              subtotal={subtotal}
+              gst={gst}
+              total={total}
+              dispatch={dispatch}
+            />
           </div>
 
         </div>

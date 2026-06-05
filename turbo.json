@@ -18,10 +18,7 @@
       "persistent": true
     },
     "dev:test": {
-      // Runs all tests across the monorepo: Vitest (unit/component) + Playwright (E2E).
-      // cache: false — tests must always run fresh; cached results would hide real failures.
-      // No dependsOn — test packages start their own servers internally (playwright webServer
-      // config) or use jsdom (vitest), so they don't need apps to be pre-built.
+      
       "cache": false
     }
   }

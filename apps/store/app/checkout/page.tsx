@@ -1,7 +1,7 @@
 // checkout/page.tsx — server-side auth guard for the checkout page.
 //
 // The checkout UI is a "use client" component (CheckoutPageClient.tsx) because
-// it needs CartContext hooks and Stripe hooks. This server component calls
+// it needs CartContext hooks. This server component calls
 // auth() BEFORE the client component renders, redirecting unauthenticated users
 // to /login at the server level (no client-side flash).
 //
