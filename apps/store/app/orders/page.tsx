@@ -14,6 +14,9 @@ import { db } from "@repo/db/client";
 import { Navbar } from "@/components/Navbar";
 import Link from "next/link";
 
+// Per-user order history — must not be statically generated at build time.
+export const dynamic = "force-dynamic";
+
 // ─── Status badge helpers ─────────────────────────────────────────────────────
 // Full class strings — Tailwind's scanner strips dynamically built classes.
 const STATUS_BADGE: Record<string, string> = {

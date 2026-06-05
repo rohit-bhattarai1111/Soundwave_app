@@ -23,6 +23,9 @@ import type { Genre, Product } from "@/lib/mock-data";
 import { ProductsProvider } from "@/contexts/ProductsContext";
 import { ProductsPageContent } from "./ProductsPageContent";
 
+// Always render at request time — product data is read from Prisma, not baked in at build.
+export const dynamic = "force-dynamic";
+
 export default async function ProductsPage() {
   // Query Prisma directly — runs on the server, no fetch() needed.
   // orderBy createdAt desc → newest products appear at the top of the table.

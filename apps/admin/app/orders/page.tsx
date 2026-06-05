@@ -4,6 +4,9 @@
 
 import { db } from "@repo/db/client";
 
+// Always render at request time — orders change frequently and this page queries Prisma.
+export const dynamic = "force-dynamic";
+
 // ─── Status helpers ───────────────────────────────────────────────────────────
 // DB stores: "PENDING" | "PAID" | "CANCELLED"
 // Full class strings — no template literals (Tailwind scanner strips dynamic classes).
