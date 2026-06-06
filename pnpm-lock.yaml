@@ -26,6 +26,9 @@ importers:
       '@prisma/adapter-libsql':
         specifier: ^5.22.0
         version: 5.22.0(@libsql/client@0.8.1)
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
       '@repo/auth':
         specifier: workspace:^
         version: link:../../packages/auth
@@ -93,6 +96,9 @@ importers:
       '@prisma/adapter-libsql':
         specifier: ^5.22.0
         version: 5.22.0(@libsql/client@0.8.1)
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
       '@repo/auth':
         specifier: workspace:^
         version: link:../../packages/auth

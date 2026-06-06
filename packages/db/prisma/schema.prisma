@@ -10,6 +10,8 @@ generator client {
   // Prisma's built-in SQLite file engine.  Without this flag the PrismaClient
   // constructor rejects the { adapter: ... } option at runtime.
   previewFeatures = ["driverAdapters"]
+  // Vercel runs Linux (rhel-openssl-3.0.x); native is for local dev on Windows/macOS.
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

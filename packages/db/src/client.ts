@@ -17,8 +17,8 @@ function createPrismaClient(): PrismaClient {
   }
   const debugPayload = {
     sessionId: "7380e9",
-    runId: "post-fix",
-    hypothesisId: "F",
+    runId: "post-fix-prisma",
+    hypothesisId: "H",
     location: "packages/db/src/client.ts:createPrismaClient",
     message: "db client init",
     data: {

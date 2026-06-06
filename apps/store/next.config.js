@@ -23,10 +23,15 @@ const nextConfig = {
   experimental: {
     outputFileTracingRoot: monorepoRoot,
     serverComponentsExternalPackages: [
+      "@prisma/client",
       "@libsql/client",
       "@prisma/adapter-libsql",
       "libsql",
     ],
+    // Hoisted install on Vercel = real files (no symlinks). Include query engine binary.
+    outputFileTracingIncludes: {
+      "/*": ["../../node_modules/.prisma/client/**/*"],
+    },
   },
 
   // serverComponentsExternalPackages only matches exact package names.
@@ -51,7 +56,9 @@ const nextConfig = {
             request === "@libsql/client" ||
             request.startsWith("@libsql/client/") ||
             request === "@prisma/adapter-libsql" ||
-            request.startsWith("@prisma/adapter-libsql/")
+            request.startsWith("@prisma/adapter-libsql/") ||
+            request === "@prisma/client" ||
+            request.startsWith("@prisma/client/")
           ) {
             return callback(null, `commonjs ${request}`);
           }

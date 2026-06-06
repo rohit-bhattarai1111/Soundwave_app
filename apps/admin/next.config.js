@@ -22,10 +22,14 @@ const nextConfig = {
   experimental: {
     outputFileTracingRoot: monorepoRoot,
     serverComponentsExternalPackages: [
+      "@prisma/client",
       "@libsql/client",
       "@prisma/adapter-libsql",
       "libsql",
     ],
+    outputFileTracingIncludes: {
+      "/*": ["../../node_modules/.prisma/client/**/*"],
+    },
   },
 
   // See apps/store/next.config.js for explanation.
@@ -46,7 +50,9 @@ const nextConfig = {
             request === "@libsql/client" ||
             request.startsWith("@libsql/client/") ||
             request === "@prisma/adapter-libsql" ||
-            request.startsWith("@prisma/adapter-libsql/")
+            request.startsWith("@prisma/adapter-libsql/") ||
+            request === "@prisma/client" ||
+            request.startsWith("@prisma/client/")
           ) {
             return callback(null, `commonjs ${request}`);
           }
