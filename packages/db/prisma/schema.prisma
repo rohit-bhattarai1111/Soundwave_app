@@ -12,9 +12,8 @@ generator client {
   previewFeatures = ["driverAdapters"]
   // Vercel runs Linux (rhel-openssl-3.0.x); native is for local dev on Windows/macOS.
   binaryTargets   = ["native", "rhel-openssl-3.0.x"]
-  // Hoisted pnpm on Vercel generates into .pnpm by default; @prisma/client reads
-  // node_modules/.prisma/client at the monorepo root — this keeps them aligned.
-  output          = "../../node_modules/.prisma/client"
+  // Relative to prisma/ (this folder): ../../../ = monorepo root.
+  output          = "../../../node_modules/.prisma/client"
 }
 
 datasource db {
