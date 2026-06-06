@@ -20,6 +20,12 @@ importers:
 
   apps/admin:
     dependencies:
+      '@libsql/client':
+        specifier: ^0.8.0
+        version: 0.8.1
+      '@prisma/adapter-libsql':
+        specifier: ^5.22.0
+        version: 5.22.0(@libsql/client@0.8.1)
       '@repo/auth':
         specifier: workspace:^
         version: link:../../packages/auth
@@ -81,6 +87,12 @@ importers:
 
   apps/store:
     dependencies:
+      '@libsql/client':
+        specifier: ^0.8.0
+        version: 0.8.1
+      '@prisma/adapter-libsql':
+        specifier: ^5.22.0
+        version: 5.22.0(@libsql/client@0.8.1)
       '@repo/auth':
         specifier: workspace:^
         version: link:../../packages/auth
