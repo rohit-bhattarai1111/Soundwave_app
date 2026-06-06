@@ -9,7 +9,7 @@ function createPrismaClient(): PrismaClient {
   let libsqlResolve = "not-checked";
   if (url.startsWith("libsql://")) {
     try {
-      libsqlResolve = require.resolve("@libsql/client");
+      libsqlResolve = String(require.resolve("@libsql/client"));
     } catch (error) {
       libsqlResolve =
         error instanceof Error ? error.message : "resolve failed";
@@ -17,8 +17,8 @@ function createPrismaClient(): PrismaClient {
   }
   const debugPayload = {
     sessionId: "7380e9",
-    runId: "pre-fix",
-    hypothesisId: "A",
+    runId: "post-fix",
+    hypothesisId: "F",
     location: "packages/db/src/client.ts:createPrismaClient",
     message: "db client init",
     data: {

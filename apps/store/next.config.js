@@ -27,16 +27,6 @@ const nextConfig = {
       "@prisma/adapter-libsql",
       "libsql",
     ],
-    outputFileTracingIncludes: {
-      "/*": [
-        "../../node_modules/@libsql/**/*",
-        "../../node_modules/.pnpm/@libsql+*/**/*",
-        "../../node_modules/.pnpm/libsql@*/**/*",
-        "../../node_modules/.pnpm/@prisma+adapter-libsql@*/**/*",
-        "../../node_modules/.pnpm/@libsql+linux-x64-gnu@*/**/*",
-        "../../node_modules/.pnpm/@libsql+linux-x64-musl@*/**/*",
-      ],
-    },
   },
 
   // serverComponentsExternalPackages only matches exact package names.
