@@ -1,20 +1,9 @@
-// PUT    /api/products/[id]  — update a product (full field replacement)
-// DELETE /api/products/[id]  — remove a product
-//
-// [id] is the cuid() string assigned by the database when the product was created.
-// Both routes require an ADMIN session (checked by requireAdmin()).
-
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@repo/db/client";
 import { requireAdmin } from "@/lib/api-auth";
 import { DB_TO_UI_GENRE, UI_TO_DB_GENRE } from "@/lib/genre";
 import type { Genre } from "@/lib/mock-data";
-
-// ─── Validation schema ────────────────────────────────────────────────────────
-// Identical to the POST schema — PUT is a full replacement (all fields required).
-// PATCH (partial update) would use .partial() to make fields optional, but we're
-// doing a full replacement here because the modal always sends all fields.
 
 const ProductUpdateSchema = z.object({
   title:      z.string().min(1, "Title is required."),
@@ -25,8 +14,6 @@ const ProductUpdateSchema = z.object({
   imageUrl:   z.string().url().or(z.literal("")),
   previewUrl: z.string().default("/preview-placeholder.mp3"),
 });
-
-// ─── PUT — update a product ───────────────────────────────────────────────────
 
 export async function PUT(
   req: NextRequest,
@@ -53,7 +40,6 @@ export async function PUT(
   const { title, artist, genre, price, stock, imageUrl, previewUrl } = result.data;
 
   try {
-    // db.product.update() throws a P2025 error if the id doesn't exist.
     const updated = await db.product.update({
       where: { id: params.id },
       data: {
@@ -67,7 +53,6 @@ export async function PUT(
       },
     });
 
-    // Return the updated product in UI format so the client can dispatch UPDATE_PRODUCT.
     return NextResponse.json({
       id:         updated.id,
       title:      updated.title,
@@ -80,11 +65,9 @@ export async function PUT(
     });
 
   } catch (err: unknown) {
-    // P2025 = "Record to update not found" — the id in the URL doesn't exist.
     if (isPrismaError(err, "P2025")) {
       return NextResponse.json({ error: "Product not found." }, { status: 404 });
     }
-    // P2002 = unique constraint — editing title+artist to match an existing pair.
     if (isPrismaError(err, "P2002")) {
       return NextResponse.json(
         { error: "A product with that title and artist already exists." },
@@ -96,8 +79,6 @@ export async function PUT(
   }
 }
 
-// ─── DELETE — remove a product ────────────────────────────────────────────────
-
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -107,10 +88,6 @@ export async function DELETE(
 
   try {
     await db.product.delete({ where: { id: params.id } });
-
-    // 204 No Content — the operation succeeded and there's nothing to return.
-    // This is the correct status code for a successful DELETE with no response body.
-    // Using `new NextResponse(null, ...)` because NextResponse.json() requires a body.
     return new NextResponse(null, { status: 204 });
 
   } catch (err: unknown) {
@@ -121,8 +98,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Server error." }, { status: 500 });
   }
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isPrismaError(err: unknown, code: string): boolean {
   return (

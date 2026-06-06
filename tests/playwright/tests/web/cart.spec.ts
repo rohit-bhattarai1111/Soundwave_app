@@ -1,5 +1,3 @@
-// cart.spec.ts — essential cart add/remove flows.
-
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

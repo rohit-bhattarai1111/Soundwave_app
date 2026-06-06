@@ -1,5 +1,3 @@
-// auth.spec.ts — essential authentication flows for the store.
-
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

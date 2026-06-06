@@ -1,41 +1,24 @@
 "use client";
 
-// login/page.tsx — store login form, wired to the real database via NextAuth.
-//
-// Auth.js v5 sign-in strategy:
-//   signIn({ redirect: false }) POSTs credentials and returns { ok } in JS.
-//   On success we router.push() to the callback URL; on failure we show an inline error.
-//   This matches the admin login page and avoids MissingCSRF in E2E/CI, where the
-//   full-page redirect flow can fail before the CSRF cookie is established.
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-// ─── Email regex ──────────────────────────────────────────────────────────────
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LoginErrors {
   email?:   string;
   password?: string;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function LoginPage() {
   const router = useRouter();
   const [fields,      setFields]      = useState({ email: "", password: "" });
   const [errors,      setErrors]      = useState<LoginErrors>({});
-  // serverError shows a message for wrong credentials (no field-level detail on
-  // purpose — don't hint which field was wrong to an attacker).
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading,     setLoading]     = useState(false);
 
-  // Auth.js redirects to /login?error=CredentialsSignin on wrong credentials.
-  // Read the error param on mount and show the message immediately.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("error")) setServerError("Invalid email or password.");
@@ -51,7 +34,6 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    // ── Client-side validation ─────────────────────────────────────────────
     const newErrors: LoginErrors = {};
     if (!EMAIL_REGEX.test(fields.email))  newErrors.email    = "Please enter a valid email address.";
     if (fields.password.length < 6)       newErrors.password = "Password must be at least 6 characters.";
@@ -60,7 +42,6 @@ export default function LoginPage() {
       return;
     }
 
-    // ── NextAuth sign-in ───────────────────────────────────────────────────
     setLoading(true);
     setServerError(null);
 
@@ -141,7 +122,6 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Wrong credentials error — vague by design (security best practice) */}
           {serverError && (
             <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
               {serverError}

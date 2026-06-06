@@ -1,38 +1,18 @@
 "use client";
 
-// login/page.tsx — admin login form, wired to NextAuth Credentials provider.
-//
-// CHANGED from iteration 1:
-//   Before: called verifyAdminLogin() (plain-text password comparison in client JS).
-//   After:  calls signIn("credentials") which POSTs to /api/auth/callback/credentials.
-//           The server runs authorize() in packages/auth/src/index.ts:
-//             1. Looks up the user by email
-//             2. bcrypt.compares the password
-//             3. Returns the user (or null)
-//           middleware.ts then checks role === "ADMIN" on every request.
-//
-// Security improvement:
-//   Old approach: password stored in source code, checked in the browser.
-//   New approach: password hashed in the DB, compared on the server, never
-//                 sent to the browser. Credentials never leave the server.
-
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense } from "react";
 
-// ─── Inner form (needs useSearchParams — must be inside Suspense) ─────────────
-
 function LoginForm() {
   const router       = useRouter();
-  // useSearchParams reads ?error=AccessDenied set by middleware.ts when a
-  // non-admin tries to access the panel.
   const searchParams = useSearchParams();
   const accessDenied = searchParams.get("error") === "AccessDenied";
 
-  const [fields,      setFields]      = useState({ email: "", password: "" });
-  const [error,       setError]       = useState<string | null>(accessDenied ? "You don't have admin access." : null);
-  const [loading,     setLoading]     = useState(false);
+  const [fields,  setFields]  = useState({ email: "", password: "" });
+  const [error,   setError]   = useState<string | null>(accessDenied ? "You don't have admin access." : null);
+  const [loading, setLoading] = useState(false);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -45,9 +25,6 @@ function LoginForm() {
     setLoading(true);
     setError(null);
 
-    // signIn("credentials") makes a POST to /api/auth/callback/credentials.
-    // `redirect: false` lets us handle the redirect in JS rather than a full
-    // page reload — better UX for showing errors inline.
     const result = await signIn("credentials", {
       email:    fields.email,
       password: fields.password,
@@ -57,12 +34,9 @@ function LoginForm() {
     setLoading(false);
 
     if (result?.ok) {
-      // middleware.ts checks the ADMIN role on every route.
-      // If the user is not ADMIN, it redirects back to /login?error=AccessDenied.
       router.push("/products");
-      router.refresh(); // re-render the Server Components so AdminShell reads the new session
+      router.refresh();
     } else {
-      // Vague message — don't confirm which field was wrong to an attacker.
       setError("Invalid email or password.");
     }
   }
@@ -120,9 +94,6 @@ function LoginForm() {
   );
 }
 
-// ─── Page component ───────────────────────────────────────────────────────────
-// LoginForm uses useSearchParams() which requires a Suspense boundary in Next.js 14.
-
 export default function AdminLoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
@@ -145,12 +116,10 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Suspense is required because LoginForm uses useSearchParams() */}
         <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-slate-800" />}>
           <LoginForm />
         </Suspense>
 
-        {/* Remove in production — never hint at valid credentials in the UI */}
         <p className="mt-6 text-center text-xs text-slate-500">
           Demo credentials:{" "}
           <span className="font-mono text-slate-400">admin@soundwave.com</span>

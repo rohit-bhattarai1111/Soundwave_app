@@ -1,5 +1,3 @@
-// orders.spec.ts — verifies order history after checkout.
-
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

@@ -1,5 +1,3 @@
-// checkout.spec.ts — essential checkout happy path and route protection.
-
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

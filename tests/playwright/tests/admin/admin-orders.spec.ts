@@ -1,5 +1,3 @@
-// admin-orders.spec.ts — essential admin orders page coverage.
-
 import { test, expect } from "@playwright/test";
 
 test("orders page loads with summary stats and table headers", async ({ page }) => {

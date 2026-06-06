@@ -1,5 +1,3 @@
-// home.spec.ts — smoke test for the public store home page.
-
 import { test, expect } from "@playwright/test";
 
 test.use({ storageState: { cookies: [], origins: [] } });

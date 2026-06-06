@@ -1,19 +1,5 @@
 "use client";
 
-// CheckoutPageClient.tsx — mock payment form (client component).
-// Rendered by checkout/page.tsx after the server-side auth check passes.
-//
-// MOCK CHECKOUT DESIGN:
-//   This is a simulated payment form with no real payment processor.
-//   The form collects card-looking fields (name, number, expiry, CVV) purely for
-//   the UI experience. None of these values are validated against a real bank.
-//
-// PAYMENT FLOW:
-//   1. User fills the form and clicks "Pay $X"
-//   2. POST /api/checkout → Prisma transaction:
-//        create Order (PAID) + OrderItems + decrement stock + clear DB cart
-//   3. On success → clear local CartContext state → navigate to /checkout/success
-
 import { useState }    from "react";
 import { useRouter }   from "next/navigation";
 import Link            from "next/link";
@@ -21,11 +7,7 @@ import { Navbar }      from "@/components/Navbar";
 import { useCart, type CartAction } from "@/contexts/CartContext";
 import type { Dispatch } from "react";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const GST_RATE = 0.1; // 10% Australian GST
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+const GST_RATE = 0.1;
 
 interface PaymentFormProps {
   items:    { id: string; title: string; artist: string; price: number; quantity: number }[];
@@ -35,39 +17,27 @@ interface PaymentFormProps {
   dispatch: Dispatch<CartAction>;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Format a raw digit string as "1234 5678 9012 3456" while the user types.
 function formatCardNumber(raw: string): string {
-  // Strip non-digits, cap at 16, then insert a space every 4 digits.
   return raw.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
 }
 
-// Format expiry as "MM / YY" while the user types.
 function formatExpiry(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 4);
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
 }
 
-// ─── Payment form ─────────────────────────────────────────────────────────────
-
 function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps) {
   const router = useRouter();
 
-  // Form field state
-  const [nameOnCard,  setNameOnCard]  = useState("");
-  const [cardNumber,  setCardNumber]  = useState("");
-  const [expiry,      setExpiry]      = useState("");
-  const [cvv,         setCvv]         = useState("");
-
-  // Error state — one string per field (empty string = no error)
-  const [errors,      setErrors]      = useState({ name: "", card: "", expiry: "", cvv: "" });
-  const [submitError, setSubmitError] = useState("");
+  const [nameOnCard,   setNameOnCard]  = useState("");
+  const [cardNumber,   setCardNumber]  = useState("");
+  const [expiry,       setExpiry]      = useState("");
+  const [cvv,          setCvv]         = useState("");
+  const [errors,       setErrors]      = useState({ name: "", card: "", expiry: "", cvv: "" });
+  const [submitError,  setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── Validation ──────────────────────────────────────────────────────────────
-  // Runs on submit. Returns true if every field is valid.
   function validate(): boolean {
     const next = { name: "", card: "", expiry: "", cvv: "" };
     let valid = true;
@@ -77,14 +47,12 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
       valid = false;
     }
 
-    // Card number: strip spaces, must be 16 digits.
     const rawCard = cardNumber.replace(/\s/g, "");
     if (rawCard.length !== 16 || !/^\d+$/.test(rawCard)) {
       next.card = "Enter a valid 16-digit card number.";
       valid = false;
     }
 
-    // Expiry: must be MM / YY with a valid month (01–12).
     const rawExpiry = expiry.replace(/\s/g, "").replace("/", "");
     if (rawExpiry.length !== 4) {
       next.expiry = "Enter expiry as MM / YY.";
@@ -97,7 +65,6 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
       }
     }
 
-    // CVV: 3 or 4 digits.
     if (!/^\d{3,4}$/.test(cvv)) {
       next.cvv = "Enter a 3 or 4-digit CVV.";
       valid = false;
@@ -107,7 +74,6 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
     return valid;
   }
 
-  // ── Submit handler ──────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitError("");
@@ -117,9 +83,6 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
     setIsSubmitting(true);
 
     try {
-      // POST /api/checkout — the server creates the order as PAID, decrements
-      // stock, and clears the DB cart. We don't send card details to the server;
-      // this is a mock, so the form values are purely cosmetic.
       const res  = await fetch("/api/checkout", { method: "POST" });
       const data = await res.json() as { orderId?: string; error?: string };
 
@@ -129,23 +92,11 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
         return;
       }
 
-      // Clear the in-memory CartContext — the DB cart was already cleared by
-      // the server. We use raw dispatch to skip the redundant DELETE /api/cart
-      // request (the server already ran DELETE CartItem WHERE userId = ...).
       dispatch({ type: "CLEAR_CART" });
 
-      // Persist a summary for the success page. sessionStorage is per-tab and
-      // cleared when the tab closes — no long-lived storage needed.
       sessionStorage.setItem(
         "lastOrder",
-        JSON.stringify({
-          orderId:  data.orderId,
-          placedAt: new Date().toISOString(),
-          items,
-          subtotal,
-          gst,
-          total,
-        })
+        JSON.stringify({ orderId: data.orderId, placedAt: new Date().toISOString(), items, subtotal, gst, total })
       );
 
       router.push("/checkout/success");
@@ -156,8 +107,6 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
     }
   }
 
-  // ── Field class helper ──────────────────────────────────────────────────────
-  // Returns Tailwind classes for an input field, with red border when there's an error.
   function fieldClass(hasError: boolean): string {
     return [
       "w-full rounded-lg border px-4 py-2.5 text-sm transition-colors",
@@ -173,16 +122,12 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
       onSubmit={handleSubmit}
       className="flex flex-col gap-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
     >
-      {/* ── Name on card ────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="nameOnCard" className="text-sm font-medium text-gray-700">
           Name on card
         </label>
         <input
-          id="nameOnCard"
-          type="text"
-          autoComplete="cc-name"
-          placeholder="Alex Smith"
+          id="nameOnCard" type="text" autoComplete="cc-name" placeholder="Alex Smith"
           value={nameOnCard}
           onChange={(e) => { setNameOnCard(e.target.value); setErrors((prev) => ({ ...prev, name: "" })); }}
           className={fieldClass(!!errors.name)}
@@ -190,81 +135,48 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
         {errors.name && <p className="text-xs font-medium text-red-500">{errors.name}</p>}
       </div>
 
-      {/* ── Card number ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="cardNumber" className="text-sm font-medium text-gray-700">
           Card number
         </label>
         <input
-          id="cardNumber"
-          type="text"
-          inputMode="numeric"
-          autoComplete="cc-number"
+          id="cardNumber" type="text" inputMode="numeric" autoComplete="cc-number"
           placeholder="1234 5678 9012 3456"
           value={cardNumber}
-          onChange={(e) => {
-            // Format as groups of 4 while the user types.
-            setCardNumber(formatCardNumber(e.target.value));
-            setErrors((prev) => ({ ...prev, card: "" }));
-          }}
+          onChange={(e) => { setCardNumber(formatCardNumber(e.target.value)); setErrors((prev) => ({ ...prev, card: "" })); }}
           className={fieldClass(!!errors.card)}
         />
         {errors.card && <p className="text-xs font-medium text-red-500">{errors.card}</p>}
       </div>
 
-      {/* ── Expiry + CVV (side by side) ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="expiry" className="text-sm font-medium text-gray-700">
-            Expiry
-          </label>
+          <label htmlFor="expiry" className="text-sm font-medium text-gray-700">Expiry</label>
           <input
-            id="expiry"
-            type="text"
-            inputMode="numeric"
-            autoComplete="cc-exp"
-            placeholder="MM / YY"
+            id="expiry" type="text" inputMode="numeric" autoComplete="cc-exp" placeholder="MM / YY"
             value={expiry}
-            onChange={(e) => {
-              setExpiry(formatExpiry(e.target.value));
-              setErrors((prev) => ({ ...prev, expiry: "" }));
-            }}
+            onChange={(e) => { setExpiry(formatExpiry(e.target.value)); setErrors((prev) => ({ ...prev, expiry: "" })); }}
             className={fieldClass(!!errors.expiry)}
           />
           {errors.expiry && <p className="text-xs font-medium text-red-500">{errors.expiry}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="cvv" className="text-sm font-medium text-gray-700">
-            CVV
-          </label>
+          <label htmlFor="cvv" className="text-sm font-medium text-gray-700">CVV</label>
           <input
-            id="cvv"
-            type="text"
-            inputMode="numeric"
-            autoComplete="cc-csc"
-            placeholder="123"
-            maxLength={4}
+            id="cvv" type="text" inputMode="numeric" autoComplete="cc-csc" placeholder="123" maxLength={4}
             value={cvv}
-            onChange={(e) => {
-              // Allow digits only, max 4 chars.
-              setCvv(e.target.value.replace(/\D/g, "").slice(0, 4));
-              setErrors((prev) => ({ ...prev, cvv: "" }));
-            }}
+            onChange={(e) => { setCvv(e.target.value.replace(/\D/g, "").slice(0, 4)); setErrors((prev) => ({ ...prev, cvv: "" })); }}
             className={fieldClass(!!errors.cvv)}
           />
           {errors.cvv && <p className="text-xs font-medium text-red-500">{errors.cvv}</p>}
         </div>
       </div>
 
-      {/* ── Server / network error ───────────────────────────────────────────── */}
       {submitError && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
-          {submitError}
-        </div>
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{submitError}</div>
       )}
 
-      {/* ── Submit button ────────────────────────────────────────────────────── */}
       <button
         type="submit"
         disabled={isSubmitting}
@@ -273,7 +185,6 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
         {isSubmitting ? "Processing…" : `Pay $${total.toFixed(2)}`}
       </button>
 
-      {/* Demo note — makes it clear this is a mock form, not real payment */}
       <p className="text-center text-xs text-gray-400">
         Demo checkout — no real payment is taken.
       </p>
@@ -281,18 +192,13 @@ function PaymentForm({ items, subtotal, gst, total, dispatch }: PaymentFormProps
   );
 }
 
-// ─── Outer page component ─────────────────────────────────────────────────────
-
 export default function CheckoutPageClient() {
-  // We need dispatch (not clearCart) in PaymentForm to skip the redundant
-  // DELETE /api/cart request — the DB cart is already cleared by the server.
   const { state, dispatch } = useCart();
 
   const subtotal = state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const gst      = subtotal * GST_RATE;
   const total    = subtotal + gst;
 
-  // Empty cart guard — shown immediately without waiting for any third-party SDK.
   if (state.items.length === 0) {
     return (
       <main className="min-h-screen bg-gray-50">
@@ -300,10 +206,7 @@ export default function CheckoutPageClient() {
         <div className="mx-auto flex max-w-md flex-col items-center gap-6 px-4 py-24 text-center">
           <p className="text-xl font-semibold text-gray-700">Nothing to check out</p>
           <p className="text-sm text-gray-400">Your cart is empty. Add some albums first.</p>
-          <Link
-            href="/"
-            className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
-          >
+          <Link href="/" className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
             Back to Store
           </Link>
         </div>
@@ -320,7 +223,6 @@ export default function CheckoutPageClient() {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
 
-          {/* ── Order summary ──────────────────────────────────────────────── */}
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-gray-800">Order Summary</h2>
 
@@ -330,9 +232,7 @@ export default function CheckoutPageClient() {
                   <li key={item.id} className="flex items-center justify-between px-5 py-4">
                     <div>
                       <p className="font-medium text-gray-900">{item.title}</p>
-                      <p className="text-sm text-gray-400">
-                        {item.artist} &times; {item.quantity}
-                      </p>
+                      <p className="text-sm text-gray-400">{item.artist} &times; {item.quantity}</p>
                     </div>
                     <span className="font-semibold text-gray-900">
                       ${(item.price * item.quantity).toFixed(2)}
@@ -343,16 +243,13 @@ export default function CheckoutPageClient() {
 
               <div className="border-t border-gray-100 px-5 py-4 space-y-2">
                 <div className="flex justify-between text-sm text-gray-500">
-                  <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-500">
-                  <span>GST (10%)</span>
-                  <span>${gst.toFixed(2)}</span>
+                  <span>GST (10%)</span><span>${gst.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-bold text-gray-900">
-                  <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>Total</span><span>${total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -362,16 +259,9 @@ export default function CheckoutPageClient() {
             </Link>
           </div>
 
-          {/* ── Payment form ───────────────────────────────────────────────── */}
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-gray-800">Payment Details</h2>
-            <PaymentForm
-              items={state.items}
-              subtotal={subtotal}
-              gst={gst}
-              total={total}
-              dispatch={dispatch}
-            />
+            <PaymentForm items={state.items} subtotal={subtotal} gst={gst} total={total} dispatch={dispatch} />
           </div>
 
         </div>

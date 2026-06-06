@@ -1,5 +1,3 @@
-// admin-crud.spec.ts — essential admin product management coverage.
-
 import { test, expect } from "@playwright/test";
 
 test("products page shows seeded albums", async ({ page }) => {

@@ -1,30 +1,9 @@
-// seed-e2e.ts — minimal test data for Playwright E2E specs.
-//
-// WHY SEPARATE FROM seed.ts?
-//   The production seed (seed.ts) has 12 albums and is meant to look realistic.
-//   E2E tests need DETERMINISTIC data: specific artists/titles that the specs
-//   search for by exact name. Using "Miles Davis" as the search term means we
-//   need exactly those albums — no more, no less.
-//
-// PRODUCTS (5 total — one per genre, two jazz for the search filter test):
-//   search.spec.ts expects:
-//     - 2 JAZZ albums by Miles Davis (search "Miles Davis" → exactly 2 results)
-//     - 1 ROCK  album (for genre filter tests)
-//     - 1 ELECTRONIC album
-//     - 1 HIP_HOP album
-//   admin-crud.spec.ts expects:
-//     - "Neon Horizon" visible in the admin products table
-//
-// USERS (2 total — one regular, one admin):
-//   auth.setup.ts logs in as both before any test runs.
-
 import { db } from "./client";
 import bcrypt from "bcryptjs";
 
 async function seedE2E() {
   console.log("🌱 Seeding E2E test database...\n");
 
-  // ── Users ────────────────────────────────────────────────────────────────────
   const adminHash = await bcrypt.hash("admin123", 10);
   await db.user.upsert({
     where:  { email: "admin@soundwave.com" },
@@ -41,8 +20,6 @@ async function seedE2E() {
   });
   console.log("  ✅ user@test.com");
 
-  // ── Products ─────────────────────────────────────────────────────────────────
-  // stockQty is reset on every E2E run so checkout tests don't exhaust stock.
   const products = [
     {
       title: "Kind of Blue",
@@ -94,7 +71,7 @@ async function seedE2E() {
   for (const p of products) {
     await db.product.upsert({
       where:  { title_artist: { title: p.title, artist: p.artist } },
-      update: { stockQty: p.stockQty }, // restore stock on re-run
+      update: { stockQty: p.stockQty },
       create: p,
     });
     console.log(`  ✅ ${p.title} — ${p.artist}`);

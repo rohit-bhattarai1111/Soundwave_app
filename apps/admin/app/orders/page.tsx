@@ -1,15 +1,8 @@
-// Orders page — async Server Component.
-// Queries Prisma directly — no fetch() round-trip needed since this runs on the server.
-// Access is guaranteed by middleware.ts (ADMIN role check runs before this page renders).
-
 import { db } from "@repo/db/client";
 
-// Always render at request time — orders change frequently and this page queries Prisma.
 export const dynamic = "force-dynamic";
 
-// ─── Status helpers ───────────────────────────────────────────────────────────
-// DB stores: "PENDING" | "PAID" | "CANCELLED"
-// Full class strings — no template literals (Tailwind scanner strips dynamic classes).
+// Full class strings required — Tailwind strips dynamically constructed class names.
 const STATUS_STYLES: Record<string, string> = {
   PENDING:   "bg-amber-100  text-amber-700",
   PAID:      "bg-emerald-100 text-emerald-700",
@@ -30,24 +23,19 @@ function formatDate(date: Date): string {
   }).format(date);
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default async function OrdersPage() {
-  // Fetch all orders with the customer (user) and each item's product info.
-  // Prisma include turns this into efficient SQL joins.
   const orders = await db.order.findMany({
     include: {
-      user:  true,           // → customer name + email
+      user:  true,
       items: {
         include: {
-          product: true,     // → product title for the items summary column
+          product: true,
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  // Compute summary stats from real data.
   const totalOrders = orders.length;
   const revenueCents = orders
     .filter((o) => o.status === "PAID")
@@ -58,7 +46,6 @@ export default async function OrdersPage() {
   return (
     <div className="flex flex-col gap-6">
 
-      {/* ── Page header ──────────────────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Orders</h1>
         <p className="mt-0.5 text-sm text-slate-500">
@@ -66,7 +53,6 @@ export default async function OrdersPage() {
         </p>
       </div>
 
-      {/* ── Summary stats cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -93,7 +79,6 @@ export default async function OrdersPage() {
 
       </div>
 
-      {/* ── Orders table ─────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
 
@@ -120,8 +105,6 @@ export default async function OrdersPage() {
                 const badge = STATUS_STYLES[order.status] ?? "bg-gray-100 text-gray-600";
                 const label = STATUS_LABELS[order.status] ?? order.status;
 
-                // Build a human-readable item summary for the Items column.
-                // e.g. "Neon Horizon × 1" or "Neon Horizon × 1, +2 more"
                 const firstItem  = order.items[0];
                 const extraCount = order.items.length - 1;
                 const itemSummary = firstItem
@@ -132,7 +115,6 @@ export default async function OrdersPage() {
                   <tr key={order.id} className="transition-colors hover:bg-slate-50">
 
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                      {/* Show the last 8 chars of the cuid for a short readable reference */}
                       #{order.id.slice(-8).toUpperCase()}
                     </td>
 

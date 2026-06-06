@@ -1,22 +1,10 @@
 "use client";
 
-// CartPageClient.tsx — shopping cart UI (client component).
-// Rendered by cart/page.tsx after the server-side auth check passes.
-//
-// Iteration 2 changes:
-//   Before: dispatch({ type: "..." }) — local state only, not persisted.
-//   After:  useCart() exposes removeItem, updateQty, clearCart which each
-//           dispatch locally (optimistic) AND fire the matching API call
-//           to keep the DB in sync. Rollback happens automatically in CartContext
-//           if the API call fails.
-
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { useCart } from "@/contexts/CartContext";
 
 export default function CartPageClient() {
-  // removeItem, updateQty, clearCart are the new semantic API from CartContext.
-  // They handle both local state (via dispatch) and DB sync (via fetch).
   const { state, removeItem, updateQty, clearCart } = useCart();
 
   const subtotal = state.items.reduce(
@@ -97,9 +85,6 @@ export default function CartPageClient() {
 
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
-
-                          {/* Decrease quantity — if it reaches 0, CartContext removes the item
-                              locally (reducer filters quantity > 0) and calls DELETE /api/cart/[id] */}
                           <button
                             onClick={() => updateQty(item.id, item.quantity - 1)}
                             aria-label={`Decrease quantity of ${item.title}`}
@@ -112,7 +97,6 @@ export default function CartPageClient() {
                             {item.quantity}
                           </span>
 
-                          {/* Increase quantity — fires PUT /api/cart/[id] with quantity + 1 */}
                           <button
                             onClick={() => updateQty(item.id, item.quantity + 1)}
                             aria-label={`Increase quantity of ${item.title}`}
@@ -120,7 +104,6 @@ export default function CartPageClient() {
                           >
                             +
                           </button>
-
                         </div>
                       </td>
 
@@ -129,7 +112,6 @@ export default function CartPageClient() {
                       </td>
 
                       <td className="px-6 py-4 text-center">
-                        {/* removeItem fires DELETE /api/cart/[id] and removes from local state */}
                         <button
                           onClick={() => removeItem(item.id)}
                           aria-label={`Remove ${item.title} from cart`}
@@ -156,7 +138,6 @@ export default function CartPageClient() {
               </div>
 
               <div className="flex items-center gap-3">
-                {/* clearCart dispatches CLEAR_CART locally + fires DELETE /api/cart */}
                 <button
                   onClick={() => clearCart()}
                   className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:border-red-300 hover:text-red-500"

@@ -1,9 +1,5 @@
-// Dashboard page — protection is handled by middleware.ts, not ProtectedRoute.
-// middleware.ts runs before this page renders and redirects non-admins to /login.
 import Link from "next/link";
 import { products, orders } from "@/lib/mock-data";
-
-// ─── Derived stats ────────────────────────────────────────────────────────────
 
 function getDashboardStats() {
   const totalProducts = products.length;
@@ -15,8 +11,6 @@ function getDashboardStats() {
   const outOfStock    = products.filter((p) => p.stock === 0).length;
   return { totalProducts, totalOrders, revenue, lowStock, outOfStock };
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const stats = getDashboardStats();
@@ -117,9 +111,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-// Presentational sub-component used only on this page — no need for its own file.
 
 function StatCard({
   label,

@@ -1,5 +1,3 @@
-// search.spec.ts — essential search and genre-filter coverage.
-
 import { test, expect } from "@playwright/test";
 
 test.use({ storageState: { cookies: [], origins: [] } });

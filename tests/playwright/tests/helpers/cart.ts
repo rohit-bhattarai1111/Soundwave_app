@@ -25,7 +25,6 @@ export async function addFirstProductToCart(page: Page) {
     page.getByRole("button", { name: "Add to Cart" }).first().click(),
   ]);
 
-  // Confirm the optimistic update + API round-trip before navigating away.
   await expect(page.getByRole("link", { name: /Cart — \d+ item/ })).toBeVisible({
     timeout: 10_000,
   });

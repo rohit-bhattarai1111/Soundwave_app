@@ -1,7 +1,3 @@
-// ─── Types ────────────────────────────────────────────────────────────────────
-// TODO iteration 2: move shared types to packages/ui so store and admin import
-// from a single source of truth instead of duplicating these definitions.
-
 export type Genre = "Rock" | "Jazz" | "Hip-Hop" | "Electronic";
 
 export interface Product {
@@ -14,9 +10,6 @@ export interface Product {
   imageUrl: string;
   previewUrl: string;
 }
-
-// ─── Mock Products ─────────────────────────────────────────────────────────────
-// TODO iteration 2: replace with database query
 
 export const products: Product[] = [
   { id: "1",  title: "Neon Horizon",    artist: "The Static Kings",  genre: "Rock",       price: 9.99,  stock: 42, imageUrl: "https://picsum.photos/seed/1/400/400",  previewUrl: "/preview-placeholder.mp3" },
@@ -33,8 +26,6 @@ export const products: Product[] = [
   { id: "12", title: "Grid Pattern",    artist: "Synthex Wave",      genre: "Electronic", price: 13.49, stock: 88, imageUrl: "https://picsum.photos/seed/12/400/400", previewUrl: "/preview-placeholder.mp3" },
 ];
 
-// ─── Types — Orders ────────────────────────────────────────────────────────────
-
 export type OrderStatus = "pending" | "completed" | "refunded";
 
 export interface Order {
@@ -46,9 +37,6 @@ export interface Order {
   status: OrderStatus;
   date: string;
 }
-
-// ─── Mock Orders ───────────────────────────────────────────────────────────────
-// TODO iteration 2: replace with database query
 
 export const orders: Order[] = [
   { id: "ORD-001", customer: "Priya Mehta",     email: "priya@example.com",   product: "Neon Horizon",    amount: 9.99,  status: "completed", date: "2026-05-14" },
