@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@repo/db/client";
+import { getOrderItemArtist, getOrderItemTitle } from "@repo/db/order-item";
 import { requireUser } from "@/lib/auth-helper";
 
 export async function GET() {
@@ -26,8 +27,8 @@ export async function GET() {
     createdAt:  order.createdAt.toISOString(),
     items: order.items.map((item) => ({
       productId:      item.productId,
-      title:          item.product.title,
-      artist:         item.product.artist,
+      title:          getOrderItemTitle(item),
+      artist:         getOrderItemArtist(item),
       quantity:       item.quantity,
       unitPriceCents: item.unitPriceCents,
     })),

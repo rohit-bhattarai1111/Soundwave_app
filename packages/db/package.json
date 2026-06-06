@@ -6,7 +6,8 @@
     "./client":  "./src/client.ts",
     "./seed":    "./src/seed.ts",
     "./data":    "./src/data.ts",
-    "./pricing": "./src/pricing.ts"
+    "./pricing":   "./src/pricing.ts",
+    "./order-item": "./src/order-item.ts"
   },
   "scripts": {
     "postinstall": "prisma generate && node scripts/sync-prisma-client.mjs",

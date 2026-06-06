@@ -41,9 +41,11 @@ export async function POST() {
           status: "PAID",
           items: {
             create: cartItems.map((ci) => ({
-              productId:      ci.productId,
-              quantity:       ci.quantity,
-              unitPriceCents: getEffectivePriceInCents(ci.product),
+              productId:       ci.productId,
+              productTitle:    ci.product.title,
+              productArtist:   ci.product.artist,
+              quantity:        ci.quantity,
+              unitPriceCents:  getEffectivePriceInCents(ci.product),
             })),
           },
         },

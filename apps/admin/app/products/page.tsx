@@ -12,17 +12,24 @@ export default async function ProductsPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const products: Product[] = dbProducts.map((p) => ({
-    id:         p.id,
-    title:      p.title,
-    artist:     p.artist,
-    genre:      (DB_TO_UI_GENRE[p.genre] ?? "Rock") as Genre,
-    price:      p.priceInCents / 100,
-    salePrice:  centsToSalePrice(p.salePriceInCents),
-    stock:      p.stockQty,
-    imageUrl:   p.imageUrl,
-    previewUrl: p.previewUrl,
-  }));
+  const products: Product[] = dbProducts.map((p) => {
+    const salePriceInCents =
+      "salePriceInCents" in p
+        ? (p as { salePriceInCents: number | null }).salePriceInCents
+        : null;
+
+    return {
+      id:         p.id,
+      title:      p.title,
+      artist:     p.artist,
+      genre:      (DB_TO_UI_GENRE[p.genre] ?? "Rock") as Genre,
+      price:      p.priceInCents / 100,
+      salePrice:  centsToSalePrice(salePriceInCents),
+      stock:      p.stockQty,
+      imageUrl:   p.imageUrl,
+      previewUrl: p.previewUrl,
+    };
+  });
 
   return (
     <ProductsProvider initialProducts={products}>

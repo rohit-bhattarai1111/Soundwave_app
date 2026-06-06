@@ -1,6 +1,7 @@
 import { auth } from "@repo/auth";
 import { redirect } from "next/navigation";
 import { db } from "@repo/db/client";
+import { getOrderItemArtist, getOrderItemTitle } from "@repo/db/order-item";
 import { Navbar } from "@/components/Navbar";
 import Link from "next/link";
 
@@ -129,10 +130,10 @@ export default async function OrdersPage() {
                         >
                           <div>
                             <p className="font-medium text-gray-900">
-                              {item.product.title}
+                              {getOrderItemTitle(item)}
                             </p>
                             <p className="text-sm text-gray-400">
-                              {item.product.artist}
+                              {getOrderItemArtist(item)}
                             </p>
                           </div>
                           <div className="text-right">

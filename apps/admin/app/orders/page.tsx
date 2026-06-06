@@ -1,4 +1,5 @@
 import { db } from "@repo/db/client";
+import { getOrderItemTitle } from "@repo/db/order-item";
 
 export const dynamic = "force-dynamic";
 
@@ -108,7 +109,7 @@ export default async function OrdersPage() {
                 const firstItem  = order.items[0];
                 const extraCount = order.items.length - 1;
                 const itemSummary = firstItem
-                  ? `${firstItem.product.title} × ${firstItem.quantity}${extraCount > 0 ? `, +${extraCount} more` : ""}`
+                  ? `${getOrderItemTitle(firstItem)} × ${firstItem.quantity}${extraCount > 0 ? `, +${extraCount} more` : ""}`
                   : "—";
 
                 return (

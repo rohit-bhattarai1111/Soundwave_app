@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@repo/db/client";
+import { getOrderItemTitle } from "@repo/db/order-item";
 import { requireAdmin } from "@/lib/api-auth";
 
 export async function GET() {
@@ -30,7 +31,7 @@ export async function GET() {
     },
     itemCount: order.items.length,
     items: order.items.map((item) => ({
-      title:          item.product.title,
+      title:          getOrderItemTitle(item),
       quantity:       item.quantity,
       unitPriceCents: item.unitPriceCents,
     })),
