@@ -20,6 +20,35 @@ const nextConfig = {
       "libsql",
     ],
   },
+
+  // See apps/store/next.config.js for explanation.
+  webpack(config, { isServer }) {
+    if (isServer) {
+      const existing = Array.isArray(config.externals)
+        ? config.externals
+        : config.externals
+          ? [config.externals]
+          : [];
+
+      config.externals = [
+        ...existing,
+        ({ request }, callback) => {
+          if (
+            request === "libsql" ||
+            request.startsWith("libsql/") ||
+            request === "@libsql/client" ||
+            request.startsWith("@libsql/client/") ||
+            request === "@prisma/adapter-libsql" ||
+            request.startsWith("@prisma/adapter-libsql/")
+          ) {
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        },
+      ];
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
