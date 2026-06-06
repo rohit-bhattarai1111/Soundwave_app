@@ -1,17 +1,11 @@
 "use client";
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 interface DeleteConfirmDialogProps {
   productTitle: string;
   onCancel:     () => void;
   onConfirm:    () => void;
-  // Passed from the parent while the DELETE fetch is in flight.
-  // Disables both buttons to prevent double-deletion or accidental cancel.
   isConfirming?: boolean;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function DeleteConfirmDialog({
   productTitle,
@@ -68,7 +62,6 @@ export function DeleteConfirmDialog({
             disabled={isConfirming}
             className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {/* Show in-progress text while the DELETE fetch is running */}
             {isConfirming ? "Deleting…" : "Delete"}
           </button>
         </div>

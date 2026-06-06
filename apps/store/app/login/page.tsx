@@ -1,44 +1,24 @@
 "use client";
 
-// login/page.tsx — store login form, wired to the real database via NextAuth.
-//
-// Auth.js v5 (beta.31) sign-in strategy:
-//   We call signIn WITHOUT redirect: false so Auth.js owns the redirect fully:
-//     - Valid credentials  → Auth.js redirects the browser to "/" (or callbackUrl).
-//     - Wrong credentials  → Auth.js redirects to /login?error=CredentialsSignin.
-//   The useEffect at mount reads ?error from the URL and shows the error message.
-//
-//   Why not redirect: false?
-//   In beta.31, signIn({ redirect: false }) with wrong credentials returns
-//   { ok: true } due to an opaque-redirect handling bug — the client can't read
-//   the redirect target URL. Using Auth.js's default redirect avoids this.
-
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-// ─── Email regex ──────────────────────────────────────────────────────────────
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LoginErrors {
   email?:   string;
   password?: string;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function LoginPage() {
+  const router = useRouter();
   const [fields,      setFields]      = useState({ email: "", password: "" });
   const [errors,      setErrors]      = useState<LoginErrors>({});
-  // serverError shows a message for wrong credentials (no field-level detail on
-  // purpose — don't hint which field was wrong to an attacker).
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading,     setLoading]     = useState(false);
 
-  // Auth.js redirects to /login?error=CredentialsSignin on wrong credentials.
-  // Read the error param on mount and show the message immediately.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("error")) setServerError("Invalid email or password.");
@@ -54,7 +34,6 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    // ── Client-side validation ─────────────────────────────────────────────
     const newErrors: LoginErrors = {};
     if (!EMAIL_REGEX.test(fields.email))  newErrors.email    = "Please enter a valid email address.";
     if (fields.password.length < 6)       newErrors.password = "Password must be at least 6 characters.";
@@ -63,24 +42,25 @@ export default function LoginPage() {
       return;
     }
 
-    // ── NextAuth sign-in ───────────────────────────────────────────────────
     setLoading(true);
     setServerError(null);
 
-    // signIn() without redirect: false lets Auth.js handle the full redirect:
-    //   - Success → browser navigates to "/" (or callbackUrl from the URL).
-    //   - Failure → browser navigates to /login?error=CredentialsSignin.
-    // The useEffect above reads ?error on the next mount and shows the message.
     const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl") ?? "/";
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       email:    fields.email,
       password: fields.password,
-      redirectTo: callbackUrl,
+      redirect: false,
     });
 
-    // This line is only reached if signIn() returns without navigating
-    // (should not happen with default redirect behaviour, but acts as a safety net).
     setLoading(false);
+
+    if (result?.error || !result?.ok) {
+      setServerError("Invalid email or password.");
+      return;
+    }
+
+    router.push(callbackUrl);
+    router.refresh();
   }
 
   return (
@@ -142,7 +122,6 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Wrong credentials error — vague by design (security best practice) */}
           {serverError && (
             <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
               {serverError}

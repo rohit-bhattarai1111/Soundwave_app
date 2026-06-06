@@ -1,23 +1,5 @@
 "use client";
 
-// ProductsPageContent — the interactive part of the Products admin page.
-//
-// This component was extracted from products/page.tsx so that page.tsx could
-// become an async Server Component (which can't use React hooks like useState).
-//
-// Data flow:
-//   DB (Prisma) → page.tsx (Server, async)
-//     → ProductsProvider (initialises reducer with DB data)
-//       → ProductsPageContent (Client, handles user interactions)
-//
-// For each mutation (add / edit / delete):
-//   1. Fire the real API call (fetch) — writes to the database.
-//   2. On success: dispatch to the local reducer (instant UI update, no page reload).
-//   3. Call router.refresh() — tells Next.js to re-run the Server Component so
-//      the next full navigation or mount gets fresh DB data.
-//   4. Show a toast notification.
-//   On error: show an error toast, leave local state unchanged.
-
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -26,17 +8,13 @@ import { AddProductModal } from "@/components/AddProductModal";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import type { Product } from "@/lib/mock-data";
 
-// ─── Genre badge colours ──────────────────────────────────────────────────────
-// Full class strings — never use template literals like `bg-${color}-100`
-// because Tailwind's scanner only detects complete class strings in the source.
+// Full class strings required — Tailwind strips dynamically constructed class names.
 const GENRE_COLORS: Record<string, string> = {
   Rock:       "bg-red-100 text-red-700",
   Jazz:       "bg-purple-100 text-purple-700",
   "Hip-Hop":  "bg-amber-100 text-amber-700",
   Electronic: "bg-cyan-100 text-cyan-700",
 };
-
-// ─── Local state types ────────────────────────────────────────────────────────
 
 interface ModalState {
   isOpen:  boolean;
@@ -51,8 +29,6 @@ interface ToastState {
   type:    "success" | "error";
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function ProductsPageContent() {
   const router = useRouter();
   const { state, dispatch } = useProducts();
@@ -60,12 +36,8 @@ export function ProductsPageContent() {
   const [modal,        setModal]        = useState<ModalState>(MODAL_CLOSED);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [toast,        setToast]        = useState<ToastState | null>(null);
-
-  // isSubmitting disables all action buttons while an API call is in flight.
-  // This prevents double-submits (e.g. rapidly clicking Delete twice).
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Show a toast for 3 seconds, then auto-clear it.
   function showToast(message: string, type: "success" | "error" = "success") {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -79,18 +51,11 @@ export function ProductsPageContent() {
     setModal({ isOpen: true, mode: "edit", product });
   }
 
-  // Called by AddProductModal when the user submits the form.
-  // The modal has already done client-side validation — this fires the real API call.
   async function handleModalSubmit(product: Product) {
-    // Disable all action buttons immediately so the user can't trigger another
-    // request while this one is in flight.
     setIsSubmitting(true);
 
     try {
       if (modal.mode === "add") {
-        // ── POST /api/products ───────────────────────────────────────────────
-        // Body uses UI format: price in dollars, display genre labels.
-        // The API route converts to DB format (cents, uppercase genre) before writing.
         const res = await fetch("/api/products", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
@@ -106,26 +71,18 @@ export function ProductsPageContent() {
         });
 
         if (!res.ok) {
-          // Extract the server's error message if available.
           const data = await res.json().catch(() => ({})) as { error?: string };
           showToast(data.error ?? "Failed to add product.", "error");
-          return;  // early exit — do NOT dispatch or close the modal
+          return;
         }
 
-        // The API returns the created product with the DB-assigned id (a cuid string).
-        // We use that instead of the temporary Date.now() id the modal generated.
         const created = await res.json() as Product;
         dispatch({ type: "ADD_PRODUCT", payload: created });
         setModal(MODAL_CLOSED);
         showToast("Product added");
-
-        // router.refresh() re-runs the Server Component (page.tsx) so that if the
-        // user navigates away and back, the table reflects the actual DB state.
         router.refresh();
 
       } else {
-        // ── PUT /api/products/[id] ───────────────────────────────────────────
-        // Full replacement — the modal always sends all fields.
         const res = await fetch(`/api/products/${product.id}`, {
           method:  "PUT",
           headers: { "Content-Type": "application/json" },
@@ -146,7 +103,6 @@ export function ProductsPageContent() {
           return;
         }
 
-        // The API returns the updated product; dispatch it to update the table row instantly.
         const updated = await res.json() as Product;
         dispatch({ type: "UPDATE_PRODUCT", payload: updated });
         setModal(MODAL_CLOSED);
@@ -155,10 +111,8 @@ export function ProductsPageContent() {
       }
 
     } catch {
-      // fetch() itself threw — usually a network error (server unreachable).
       showToast("Network error. Please try again.", "error");
     } finally {
-      // Always re-enable buttons when the async operation completes (success or error).
       setIsSubmitting(false);
     }
   }
@@ -172,13 +126,10 @@ export function ProductsPageContent() {
     setIsSubmitting(true);
 
     try {
-      // ── DELETE /api/products/[id] ────────────────────────────────────────
       const res = await fetch(`/api/products/${deleteTarget.id}`, {
         method: "DELETE",
       });
 
-      // 204 No Content — success, no body.
-      // res.ok is true for any 2xx status, including 204.
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string };
         showToast(data.error ?? "Failed to delete product.", "error");
@@ -200,7 +151,6 @@ export function ProductsPageContent() {
   return (
     <div className="flex flex-col gap-6">
 
-      {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Products</h1>
@@ -220,7 +170,6 @@ export function ProductsPageContent() {
         </button>
       </div>
 
-      {/* ── Products table ──────────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
 
@@ -318,8 +267,6 @@ export function ProductsPageContent() {
         </table>
       </div>
 
-      {/* ── Modals ──────────────────────────────────────────────────────────── */}
-
       {modal.isOpen && (
         <AddProductModal
           mode={modal.mode}
@@ -339,9 +286,6 @@ export function ProductsPageContent() {
         />
       )}
 
-      {/* ── Toast notification ───────────────────────────────────────────────
-          Appears bottom-right, auto-dismisses after 3 seconds.
-          Green (slate-800) for success, red for errors. */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl px-5 py-3.5 text-sm font-medium text-white shadow-lg transition-opacity ${
           toast.type === "error" ? "bg-red-600" : "bg-slate-800"

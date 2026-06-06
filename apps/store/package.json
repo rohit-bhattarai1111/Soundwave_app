@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "dev:test": "next dev --port 3002",
+    "start:e2e": "node ../../scripts/dev-test-server.mjs store 3002 store.session-token",
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint --max-warnings 0",
@@ -20,10 +20,7 @@
     "next-auth": "5.0.0-beta.31",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zod": "^4.4.3",
-    "stripe": "^17.7.0",
-    "@stripe/stripe-js": "^5.8.0",
-    "@stripe/react-stripe-js": "^3.3.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
@@ -32,6 +29,7 @@
     "@types/node": "^22.15.3",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
+    "dotenv-cli": "^8.0.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.39.1",
     "postcss": "^8.5.3",

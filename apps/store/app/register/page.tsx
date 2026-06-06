@@ -5,11 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
-// ─── Email regex ──────────────────────────────────────────────────────────────
-// Loose structural check — full RFC 5321 validation is not worth it client-side.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RegisterErrors {
   name?: string;
@@ -17,8 +13,6 @@ interface RegisterErrors {
   password?: string;
   confirmPassword?: string;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -30,10 +24,7 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
   const [errors, setErrors] = useState<RegisterErrors>({});
-  // serverError holds a top-level message for failures not tied to a specific field
-  // (e.g. 500 Internal Server Error, unexpected network failure).
   const [serverError, setServerError] = useState<string | null>(null);
-  // loading prevents double-submit while the fetch is in flight.
   const [loading, setLoading] = useState(false);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -42,15 +33,9 @@ export default function RegisterPage() {
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
-  // handleSubmit is async because it awaits the fetch to the register API.
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    // ── Client-side validation (fast, no network round-trip) ─────────────────
-    // We still validate on the client even though the server also validates.
-    // Reason: immediate feedback while the user is filling the form.
-    // The server re-validates because it's the last line of defence — a client
-    // could bypass the form and send requests directly (e.g. with curl).
     const newErrors: RegisterErrors = {};
 
     if (fields.name.trim().length === 0) {
@@ -70,7 +55,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // ── API call ──────────────────────────────────────────────────────────────
     setLoading(true);
     setServerError(null);
 
@@ -78,7 +62,6 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        // JSON.stringify serialises the JS object into a string the server can parse.
         body: JSON.stringify({
           name:     fields.name,
           email:    fields.email,
@@ -87,42 +70,32 @@ export default function RegisterPage() {
       });
 
       if (res.ok) {
-        // 201 Created — user row is in the DB.
-        // Auto sign-in: call NextAuth's credentials flow so the user doesn't
-        // have to log in again immediately after registering.
         await signIn("credentials", {
           email:    fields.email,
           password: fields.password,
           redirect: false,
         });
         router.push("/");
-        router.refresh(); // re-render Server Components with the new session
+        router.refresh();
         return;
       }
 
-      // Non-OK response — parse the error body.
       const data = await res.json() as { error: string; details?: Record<string, string[]> };
 
       if (res.status === 409) {
-        // Conflict — email already registered.
         setErrors({ email: data.error });
       } else if (res.status === 400 && data.details) {
-        // Validation error from Zod — map field-level messages.
-        // data.details looks like { email: ["Please enter a valid email."] }
         setErrors({
           name:     data.details.name?.[0],
           email:    data.details.email?.[0],
           password: data.details.password?.[0],
         });
       } else {
-        // Any other error (500, unexpected format, etc.) — show a top-level message.
         setServerError(data.error ?? "Something went wrong. Please try again.");
       }
     } catch {
-      // Network failure (no internet, server down, etc.)
       setServerError("Could not connect to the server. Please try again.");
     } finally {
-      // Always re-enable the button whether the request succeeded or failed.
       setLoading(false);
     }
   }
@@ -234,14 +207,12 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* Top-level server error — shown only when the error isn't tied to a field */}
           {serverError && (
             <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
               {serverError}
             </p>
           )}
 
-          {/* disabled while loading to prevent double-submit */}
           <button
             type="submit"
             disabled={loading}

@@ -1,8 +1,39 @@
 # ─── CI Workflow ──────────────────────────────────────────────────────────────
 #
 # Runs on every push to `main` and on every pull request that targets `main`.
-# A single job — "build-and-lint" — installs deps, compiles both Next.js apps,
-# and runs ESLint across the whole monorepo.
+# A single job — "ci" — installs deps, sets up the database, builds, lints,
+# runs unit tests (Vitest), and runs E2E tests (Playwright) all in one pass.
+#
+# WHY SQLITE MAKES CI SIMPLE:
+#   A Postgres or MySQL CI setup requires a "service container" — Docker starts
+#   a database server as a sidecar, and CI must wait for it to become healthy
+#   (tcp port open, accept connections, etc.) before any test can run.
+#   That adds ~30 s of startup, config boilerplate, and occasional flakiness.
+#
+#   SQLite is just a FILE. There is no server, no port, no health check.
+#   `prisma migrate deploy` creates the file and applies the schema in ~1 s.
+#   Each CI run starts with a brand-new empty file — perfect test isolation
+#   with zero extra configuration.
+#
+# WHY A FRESH DATABASE ON EVERY RUN:
+#   If the database were shared between runs (e.g. a persistent Postgres instance),
+#   leftover rows from a previous run could cause false failures.
+#   Example: the cart test adds an item, then a later run finds it still there
+#   and the "empty cart" assertion fails. A fresh file eliminates this entirely.
+#
+# PRISMA MIGRATE DEPLOY vs. MIGRATE DEV:
+#   `migrate dev`    — interactive; creates new migration files from schema changes;
+#                      meant for local development only. Never use in CI.
+#   `migrate deploy` — non-interactive; applies EXISTING migration files in order;
+#                      designed for CI and production. It never prompts, never diffs,
+#                      just runs the SQL from the migrations/ folder.
+#
+# GITHUB ACTIONS ARTIFACT (Playwright report):
+#   An artifact is a zip of files GitHub stores alongside a workflow run.
+#   Playwright generates an HTML report with screenshots and traces for every
+#   failed test. Uploading it as an artifact means you can download it from the
+#   Actions UI ("Artifacts" section) to diagnose failures without re-running CI.
+#   We only upload on failure (if: failure()) to keep storage usage low.
 #
 # If ANY step exits with a non-zero status code, GitHub marks the workflow as
 # failed and blocks the PR merge (when branch protection rules are configured).
@@ -18,9 +49,17 @@ on:
 
 # ─── Jobs ─────────────────────────────────────────────────────────────────────
 jobs:
-  build-and-lint:
-    name: Build & Lint
+  ci:
+    name: Build, Test & E2E
     runs-on: ubuntu-latest   # fresh Linux VM for every run
+
+    # DATABASE_URL uses an absolute path via ${{ github.workspace }} so that
+    # every step — regardless of working directory — resolves to the same file.
+    # This is equivalent to `file:./packages/db/prisma/test.db` when run from
+    # the repo root, but is explicit so that `cd packages/db && ...` steps work
+    # without accidentally pointing at a different location.
+    env:
+      DATABASE_URL: "file:${{ github.workspace }}/packages/db/prisma/test.db"
 
     steps:
 
@@ -30,15 +69,15 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. Install pnpm before Node so that setup-node can cache the pnpm store.
-      #    The version is pinned to match the `packageManager` field in package.json.
+      #    Version is pinned to match `packageManager` in root package.json.
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
 
-      # 3. Install Node.js 20 and tell it to cache the pnpm content-addressable
-      #    store (~/.pnpm-store). Subsequent runs restore the cache and skip
-      #    downloading packages that haven't changed — much faster installs.
+      # 3. Install Node.js 20 and cache the pnpm content-addressable store.
+      #    The cache key is derived from pnpm-lock.yaml, so it only updates
+      #    when dependencies actually change — fast installs on unchanged deps.
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
@@ -46,35 +85,97 @@ jobs:
           cache: 'pnpm'
 
       # 4. Install exact dependency versions from pnpm-lock.yaml.
-      #    --frozen-lockfile = npm ci equivalent: fails if the lockfile is out of
-      #    date rather than silently updating it. This guarantees reproducibility —
-      #    every CI run uses the exact same package versions as the developer's machine.
+      #    --frozen-lockfile = npm ci equivalent: fails if the lockfile is stale
+      #    rather than silently updating it. Guarantees reproducible installs.
+      #    The @repo/db postinstall hook runs `prisma generate` automatically.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 5. Build both Next.js apps via Turborepo.
+      # 5. Generate the Prisma Client from schema.prisma.
+      #    pnpm install already calls `prisma generate` via the @repo/db
+      #    postinstall hook, but we run it explicitly here to make the step
+      #    visible in the CI log and to ensure it uses the right schema path.
+      #    No database connection is needed — this only reads the schema file
+      #    and writes TypeScript types into node_modules/@prisma/client.
+      #
+      #    WHY pnpm --filter instead of npx prisma?
+      #    `npx prisma` resolves to the LATEST prisma on npm (currently v7),
+      #    which has breaking schema changes. We must use the version installed
+      #    in the workspace (5.22.x) by routing through pnpm's binary resolution.
+      - name: Generate Prisma Client
+        run: pnpm --filter @repo/db exec prisma generate
+
+      # 6. Apply migrations to create the test database file.
+      #    `migrate deploy` reads every file in packages/db/prisma/migrations/
+      #    and runs them in order against the DATABASE_URL defined in the env
+      #    block above. On a fresh runner there is no test.db yet — Prisma
+      #    creates it and runs the CREATE TABLE statements from migration.sql.
+      #    This command is safe and idempotent: it skips already-applied migrations.
+      - name: Run database migrations
+        run: pnpm --filter @repo/db exec prisma migrate deploy
+
+      # 7. Seed the database with initial data.
+      #    `pnpm --filter @repo/db run db:seed` runs `prisma db seed` from
+      #    packages/db/, which loads packages/db/.env then calls tsx src/seed.ts.
+      #    DATABASE_URL from the job env block overrides the .env file value,
+      #    so the seed writes to test.db (file:) not the Turso production DB.
+      - name: Seed database
+        run: pnpm --filter @repo/db run db:seed
+
+      # 8. Build both Next.js apps via Turborepo.
       #    `pnpm run build` → root package.json script → `turbo run build`
       #    Turbo builds packages in dependency order: shared packages first,
       #    then store and admin in parallel. TypeScript errors surface here.
       - name: Build
         run: pnpm run build
 
-      # 6. Run ESLint across both apps.
+      # 9. Run ESLint across both apps.
       #    Both apps use `eslint --max-warnings 0`, so even a single warning
-      #    is treated as a failure. This enforces strict code-style compliance.
+      #    is treated as a failure — enforces strict code-style compliance.
       - name: Lint
         run: pnpm run lint
 
-      # 7. Run Vitest unit and component tests.
-      #    Targets the @soundwave/tests-vitest workspace package which runs both
-      #    the store and admin test suites. A failing test exits non-zero → CI fails.
-      #    The full workflow definition lives at tests/vitest/.github/workflows/vitest.yml.
+      # 10. Run Vitest unit and component tests.
+      #     Targets the @soundwave/tests-vitest workspace package.
+      #     These tests mock the database — they don't touch test.db.
       - name: Test (Vitest)
         run: pnpm --filter @soundwave/tests-vitest test
 
-      # 8. Playwright E2E tests are intentionally NOT run in this root CI job.
-      #    They require real browser binaries, a running database, and Stripe keys —
-      #    all handled by their own dedicated workflow at:
-      #      .github/workflows/playwright.yml
-      #    Running them here would make every push significantly slower (2–5 min).
-      #    The Playwright workflow runs in parallel with this one on every push.
+      # 11. Install Chromium and its OS-level dependencies.
+      #     --with-deps installs system libraries (libglib2, libnss3, etc.)
+      #     that Chromium requires on Ubuntu but are not pre-installed on the
+      #     GitHub runner. This step is cached between runs by Playwright.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @soundwave/tests-playwright exec playwright install chromium --with-deps
+
+      # 12. Run Playwright E2E tests.
+      #     playwright.config.ts starts both Next.js dev servers (store + admin)
+      #     automatically. global-setup.ts resets the test DB via `migrate reset`
+      #     and seeds it with E2E-specific data (seed-e2e.ts) before any spec runs.
+      #     DATABASE_URL is inherited from the job env so both the global setup
+      #     and the web servers point at the same file.
+      #
+      #     No external secrets needed — the checkout uses a mock form with no
+      #     real payment processor.
+      - name: Run Playwright E2E tests
+        run: pnpm --filter @soundwave/tests-playwright test
+        env:
+          CI: "true"
+
+      # 13. Upload Playwright HTML report on failure.
+      #     The report contains a timeline, screenshots (on failure), and
+      #     network traces (on first retry) for every test — indispensable for
+      #     diagnosing CI failures without a local repro.
+      #
+      #     `if: failure()` means this step ONLY runs when a previous step
+      #     failed. If all tests pass, no artifact is uploaded (saves storage).
+      #
+      #     Find the report under Actions → your failed run → Artifacts.
+      #     It is retained for 14 days, then automatically deleted by GitHub.
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: tests/playwright/playwright-report/
+          retention-days: 14

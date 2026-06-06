@@ -3,8 +3,6 @@
 import { useState } from "react";
 import type { Product, Genre } from "@/lib/mock-data";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 // price and stock are strings while the user types — allows "9." without React
 // stripping the trailing dot before the user finishes entering the value.
 interface ProductFormFields {
@@ -34,19 +32,13 @@ const EMPTY_FIELDS: ProductFormFields = {
   imageUrl: "",
 };
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 interface AddProductModalProps {
   mode: "add" | "edit";
   initialProduct?: Product;
   onClose:      () => void;
   onSubmit:     (product: Product) => void;
-  // Passed from the parent while a fetch is in flight — disables the submit button
-  // so the admin can't fire duplicate requests by clicking "Save" multiple times.
   isSubmitting?: boolean;
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function AddProductModal({
   mode,
@@ -108,7 +100,6 @@ export function AddProductModal({
     }
 
     const product: Product = {
-      // TODO iteration 2: database assigns the id on add
       id:         mode === "edit" && initialProduct ? initialProduct.id : String(Date.now()),
       title:      fields.title.trim(),
       artist:     fields.artist.trim(),
@@ -275,7 +266,6 @@ export function AddProductModal({
               disabled={isSubmitting}
               className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {/* Show a spinner-style label while the API call is in flight */}
               {isSubmitting
                 ? (mode === "add" ? "Saving…" : "Updating…")
                 : (mode === "add" ? "Save Product" : "Update Product")
