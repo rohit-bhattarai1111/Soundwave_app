@@ -3,9 +3,8 @@
 [![CI](https://github.com/rohit-bhattarai1111/Soundwave_app/actions/workflows/ci.yml/badge.svg)](https://github.com/rohit-bhattarai1111/Soundwave_app/actions/workflows/ci.yml)
 
 A full-stack B2C music store built as a learning project across two iterations.
-**Iteration 1** (this branch) is a complete, interactive frontend with mock data and
-client-side state. **Iteration 2** will add a real database, REST API, and production
-authentication.
+**Iteration 2** is complete — real database (SQLite via Turso), REST API, production
+auth (NextAuth.js), CI pipeline, and deployment to Vercel.
 
 The project is a Turborepo monorepo containing two Next.js 14 apps — a customer-facing
 store and an internal admin dashboard — that share a common UI package.
@@ -143,6 +142,19 @@ The admin dashboard uses **hardcoded credentials** for Iteration 1 (no database 
 - Server-side validation (not just client-side)
 - Image uploads (replace picsum.photos placeholders)
 - Deployment (Vercel / Railway)
+
+---
+
+## API Documentation
+
+The full REST API reference — every endpoint, request body, response shape, and example
+curl/fetch snippet — is in **[docs/API.md](./docs/API.md)**.
+
+Covered in that document:
+- Store public API: products, cart, checkout, orders
+- Admin API: product CRUD, order listing
+- Authentication model (session cookies, role enforcement)
+- Beginner explainers: what an API contract is, cookies vs Bearer tokens, when to use Swagger
 
 ---
 
