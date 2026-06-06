@@ -1,5 +1,6 @@
 import { db } from "@repo/db/client";
 import { DB_TO_UI_GENRE } from "@/lib/genre";
+import { centsToSalePrice } from "@/lib/product-schema";
 import type { Genre, Product } from "@/lib/mock-data";
 import { ProductsProvider } from "@/contexts/ProductsContext";
 import { ProductsPageContent } from "./ProductsPageContent";
@@ -17,6 +18,7 @@ export default async function ProductsPage() {
     artist:     p.artist,
     genre:      (DB_TO_UI_GENRE[p.genre] ?? "Rock") as Genre,
     price:      p.priceInCents / 100,
+    salePrice:  centsToSalePrice(p.salePriceInCents),
     stock:      p.stockQty,
     imageUrl:   p.imageUrl,
     previewUrl: p.previewUrl,

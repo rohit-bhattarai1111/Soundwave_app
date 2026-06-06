@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "dotenv -e .env.local -o -- next dev --port 3001",
     "start:e2e": "node ../../scripts/dev-test-server.mjs admin 3003 admin.session-token",
     "build": "pnpm --filter @repo/db exec prisma generate && next build",
     "start": "next start --port 3001",

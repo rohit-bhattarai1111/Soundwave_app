@@ -3,14 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./client": "./src/client.ts",
-    "./seed":   "./src/seed.ts",
-    "./data":   "./src/data.ts"
+    "./client":  "./src/client.ts",
+    "./seed":    "./src/seed.ts",
+    "./data":    "./src/data.ts",
+    "./pricing": "./src/pricing.ts"
   },
   "scripts": {
-    "postinstall": "prisma generate",
-    "db:migrate":  "prisma migrate dev",
-    "db:generate": "prisma generate",
+    "postinstall": "prisma generate && node scripts/sync-prisma-client.mjs",
+    "db:migrate":        "prisma migrate dev",
+    "db:migrate:turso":  "tsx src/migrate-turso.ts",
+    "db:fix:sale-column": "tsx src/fix-sale-column.ts",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate && node scripts/sync-prisma-client.mjs",
     "db:seed":     "prisma db seed",
     "db:studio":   "prisma studio",
     "db:reset":    "prisma migrate reset --force"

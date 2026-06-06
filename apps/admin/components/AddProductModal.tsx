@@ -3,33 +3,36 @@
 import { useState } from "react";
 import type { Product, Genre } from "@/lib/mock-data";
 
-// price and stock are strings while the user types — allows "9." without React
-// stripping the trailing dot before the user finishes entering the value.
 interface ProductFormFields {
-  title:    string;
-  artist:   string;
-  genre:    Genre;
-  price:    string;
-  stock:    string;
-  imageUrl: string;
+  title:     string;
+  artist:    string;
+  genre:     Genre;
+  price:     string;
+  stock:     string;
+  imageUrl:  string;
+  onSale:    boolean;
+  salePrice: string;
 }
 
 interface ProductFormErrors {
-  title?:  string;
-  artist?: string;
-  price?:  string;
-  stock?:  string;
+  title?:     string;
+  artist?:    string;
+  price?:     string;
+  stock?:     string;
+  salePrice?: string;
 }
 
 const GENRES: Genre[] = ["Rock", "Jazz", "Hip-Hop", "Electronic"];
 
 const EMPTY_FIELDS: ProductFormFields = {
-  title:    "",
-  artist:   "",
-  genre:    "Rock",
-  price:    "",
-  stock:    "",
-  imageUrl: "",
+  title:     "",
+  artist:    "",
+  genre:     "Rock",
+  price:     "",
+  stock:     "",
+  imageUrl:  "",
+  onSale:    false,
+  salePrice: "",
 };
 
 interface AddProductModalProps {
@@ -51,12 +54,14 @@ export function AddProductModal({
   const [fields, setFields] = useState<ProductFormFields>(() =>
     initialProduct
       ? {
-          title:    initialProduct.title,
-          artist:   initialProduct.artist,
-          genre:    initialProduct.genre,
-          price:    String(initialProduct.price),
-          stock:    String(initialProduct.stock),
-          imageUrl: initialProduct.imageUrl,
+          title:     initialProduct.title,
+          artist:    initialProduct.artist,
+          genre:     initialProduct.genre,
+          price:     String(initialProduct.price),
+          stock:     String(initialProduct.stock),
+          imageUrl:  initialProduct.imageUrl,
+          onSale:    initialProduct.salePrice != null,
+          salePrice: initialProduct.salePrice != null ? String(initialProduct.salePrice) : "",
         }
       : EMPTY_FIELDS
   );
@@ -66,8 +71,14 @@ export function AddProductModal({
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) {
-    const { name, value } = e.target;
-    setFields((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
+
+    setFields((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+      ...(name === "onSale" && !checked ? { salePrice: "" } : {}),
+    }));
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
@@ -94,6 +105,16 @@ export function AddProductModal({
       newErrors.stock = "Enter a valid stock quantity (0 or more).";
     }
 
+    const listPrice = parseFloat(fields.price);
+    if (fields.onSale) {
+      const sale = parseFloat(fields.salePrice);
+      if (isNaN(sale) || sale <= 0) {
+        newErrors.salePrice = "Enter a valid sale price greater than 0.";
+      } else if (!isNaN(listPrice) && sale >= listPrice) {
+        newErrors.salePrice = "Sale price must be less than the regular price.";
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -105,6 +126,9 @@ export function AddProductModal({
       artist:     fields.artist.trim(),
       genre:      fields.genre,
       price:      parseFloat(parseFloat(fields.price).toFixed(2)),
+      salePrice:  fields.onSale
+        ? parseFloat(parseFloat(fields.salePrice).toFixed(2))
+        : null,
       stock:      parseInt(fields.stock, 10),
       imageUrl:   fields.imageUrl.trim() || `https://picsum.photos/seed/${encodeURIComponent(fields.title)}/400/400`,
       previewUrl: initialProduct?.previewUrl ?? "/preview-placeholder.mp3",
@@ -233,6 +257,38 @@ export function AddProductModal({
               )}
             </div>
 
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4">
+            <label className="flex cursor-pointer items-center gap-2.5">
+              <input
+                id="onSale"
+                name="onSale"
+                type="checkbox"
+                checked={fields.onSale}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-sm font-medium text-slate-700">On sale</span>
+            </label>
+
+            {fields.onSale && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="salePrice" className="text-sm font-medium text-slate-700">
+                  Sale price ($) <span className="text-red-400">*</span>
+                </label>
+                <input
+                  id="salePrice" name="salePrice" type="number"
+                  min="0.01" step="0.01" placeholder="6.99"
+                  value={fields.salePrice}
+                  onChange={handleChange}
+                  className={inputClass("salePrice")}
+                />
+                {errors.salePrice && (
+                  <p className="text-xs font-medium text-red-500">{errors.salePrice}</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

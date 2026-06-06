@@ -15,10 +15,10 @@ test("admin can add a product, verify it in the store, then delete it", async ({
   await page.getByRole("button", { name: "Add Product" }).click();
 
   await page.getByLabel(/album title/i).fill(title);
-  await page.getByLabel(/artist/i).fill("E2E Artist");
+  await page.getByLabel(/^artist/i).fill("E2E Artist");
   await page.getByLabel(/genre/i).selectOption("Rock");
-  await page.getByLabel(/price/i).fill("9.99");
-  await page.getByLabel(/stock/i).fill("10");
+  await page.getByLabel(/^price \(\$\)/i).fill("9.99");
+  await page.getByLabel(/^stock/i).fill("10");
   await page.getByLabel(/image url/i).fill(`https://picsum.photos/seed/${timestamp}/400/400`);
   await page.getByRole("button", { name: "Save Product" }).click();
   await expect(page.getByText(title)).toBeVisible();
@@ -28,6 +28,39 @@ test("admin can add a product, verify it in the store, then delete it", async ({
   await expect(storePage.getByRole("heading", { name: title })).toBeVisible({
     timeout: 10_000,
   });
+  await storePage.close();
+
+  await page.getByRole("row").filter({ hasText: title }).getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("button", { name: "Delete" }).last().click();
+  await expect(page.getByRole("row").filter({ hasText: title })).toHaveCount(0, { timeout: 10_000 });
+});
+
+test("admin can put a product on sale and it appears in the store sale filter", async ({ page }) => {
+  const timestamp = Date.now();
+  const title = `E2E Sale ${timestamp}`;
+
+  await page.goto("/products");
+  await page.getByRole("button", { name: "Add Product" }).click();
+
+  await page.getByLabel(/album title/i).fill(title);
+  await page.getByLabel(/^artist/i).fill("E2E Sale Artist");
+  await page.getByLabel(/genre/i).selectOption("Rock");
+  await page.getByLabel(/^price \(\$\)/i).fill("12.99");
+  await page.getByLabel(/stock/i).fill("10");
+  await page.getByLabel(/image url/i).fill(`https://picsum.photos/seed/${timestamp}/400/400`);
+  await page.getByLabel(/on sale/i).check();
+  await page.getByLabel(/sale price/i).fill("8.99");
+  await page.getByRole("button", { name: "Save Product" }).click();
+  await expect(page.getByText(title)).toBeVisible();
+
+  const storePage = await page.context().newPage();
+  await storePage.goto("http://localhost:3002/?sale=1");
+  await expect(storePage.getByRole("heading", { name: title })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  const card = storePage.getByRole("article").filter({ hasText: title });
+  await expect(card.getByText("$8.99")).toBeVisible();
   await storePage.close();
 
   await page.getByRole("row").filter({ hasText: title }).getByRole("button", { name: "Delete" }).click();

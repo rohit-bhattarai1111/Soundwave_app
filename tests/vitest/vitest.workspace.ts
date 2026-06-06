@@ -70,4 +70,19 @@ export default defineWorkspace([
     },
   },
 
+  // ── DB / shared package project ────────────────────────────────────────────
+  {
+    test: {
+      name: "db",
+      include: ["tests/db/**/*.test.ts"],
+      environment: "node",
+      globals: true,
+    },
+    resolve: {
+      alias: {
+        "@repo/db/pricing": resolve(__dirname, "../../packages/db/src/pricing.ts"),
+      },
+    },
+  },
+
 ]);

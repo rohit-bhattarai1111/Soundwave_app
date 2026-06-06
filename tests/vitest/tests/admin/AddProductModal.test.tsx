@@ -91,3 +91,45 @@ describe("AddProductModal — validation", () => {
   });
 
 });
+
+describe("AddProductModal — sale pricing", () => {
+
+  function fillRequiredFields() {
+    fireEvent.change(screen.getByLabelText(/album title/i), { target: { value: "Sale Album" } });
+    fireEvent.change(screen.getByLabelText(/^artist/i), { target: { value: "Sale Artist" } });
+    fireEvent.change(screen.getByLabelText(/^price \(\$\)/i), { target: { value: "9.99" } });
+    fireEvent.change(screen.getByLabelText(/^stock/i), { target: { value: "5" } });
+  }
+
+  it("requires a sale price when On sale is checked", () => {
+    renderModal();
+    fillRequiredFields();
+    fireEvent.click(screen.getByLabelText(/on sale/i));
+    fireEvent.click(screen.getByRole("button", { name: /save product/i }));
+    expect(screen.getByText("Enter a valid sale price greater than 0.")).toBeInTheDocument();
+  });
+
+  it("rejects a sale price greater than or equal to the regular price", () => {
+    const onSubmit = vi.fn();
+    renderModal(onSubmit);
+    fillRequiredFields();
+    fireEvent.click(screen.getByLabelText(/on sale/i));
+    fireEvent.change(screen.getByLabelText(/sale price/i), { target: { value: "9.99" } });
+    fireEvent.click(screen.getByRole("button", { name: /save product/i }));
+    expect(screen.getByText("Sale price must be less than the regular price.")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("submits salePrice when On sale is checked with a valid sale price", () => {
+    const onSubmit = vi.fn();
+    renderModal(onSubmit);
+    fillRequiredFields();
+    fireEvent.click(screen.getByLabelText(/on sale/i));
+    fireEvent.change(screen.getByLabelText(/sale price/i), { target: { value: "6.99" } });
+    fireEvent.click(screen.getByRole("button", { name: /save product/i }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ price: 9.99, salePrice: 6.99 })
+    );
+  });
+
+});

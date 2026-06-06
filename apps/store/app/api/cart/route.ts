@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@repo/db/client";
+import { getEffectivePriceInCents } from "@repo/db/pricing";
 import { requireUser } from "@/lib/auth-helper";
 
 const AddToCartSchema = z.object({
@@ -22,7 +23,7 @@ export async function GET() {
     id:       ci.productId,
     title:    ci.product.title,
     artist:   ci.product.artist,
-    price:    ci.product.priceInCents / 100,
+    price:    getEffectivePriceInCents(ci.product) / 100,
     quantity: ci.quantity,
   }));
 

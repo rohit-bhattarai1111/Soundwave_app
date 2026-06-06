@@ -64,6 +64,7 @@ export function ProductsPageContent() {
             artist:     product.artist,
             genre:      product.genre,
             price:      product.price,
+            salePrice:  product.salePrice ?? null,
             stock:      product.stock,
             imageUrl:   product.imageUrl,
             previewUrl: product.previewUrl,
@@ -91,6 +92,7 @@ export function ProductsPageContent() {
             artist:     product.artist,
             genre:      product.genre,
             price:      product.price,
+            salePrice:  product.salePrice ?? null,
             stock:      product.stock,
             imageUrl:   product.imageUrl,
             previewUrl: product.previewUrl,
@@ -225,7 +227,21 @@ export function ProductsPageContent() {
                   </td>
 
                   <td className="px-4 py-3 text-right font-medium text-slate-700">
-                    ${product.price.toFixed(2)}
+                    {product.salePrice != null ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-xs text-slate-400 line-through">
+                          ${product.price.toFixed(2)}
+                        </span>
+                        <span className="font-semibold text-emerald-600">
+                          ${product.salePrice.toFixed(2)}
+                        </span>
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                          Sale
+                        </span>
+                      </div>
+                    ) : (
+                      <>${product.price.toFixed(2)}</>
+                    )}
                   </td>
 
                   <td className="px-4 py-3 text-right">

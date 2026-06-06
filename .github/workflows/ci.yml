@@ -60,6 +60,7 @@ jobs:
     # without accidentally pointing at a different location.
     env:
       DATABASE_URL: "file:${{ github.workspace }}/packages/db/prisma/test.db"
+      AUTH_SECRET: "ci-test-secret-soundwave-32chars"
 
     steps:
 
@@ -103,7 +104,7 @@ jobs:
       #    which has breaking schema changes. We must use the version installed
       #    in the workspace (5.22.x) by routing through pnpm's binary resolution.
       - name: Generate Prisma Client
-        run: pnpm --filter @repo/db exec prisma generate
+        run: pnpm --filter @repo/db run db:generate
 
       # 6. Apply migrations to create the test database file.
       #    `migrate deploy` reads every file in packages/db/prisma/migrations/

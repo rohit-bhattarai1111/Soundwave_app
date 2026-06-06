@@ -6,6 +6,7 @@ export interface Product {
   artist: string;
   genre: Genre;
   price: number;
+  salePrice?: number | null;
   stock: number;
   imageUrl: string;
   previewUrl: string;

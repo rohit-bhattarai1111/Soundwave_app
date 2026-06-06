@@ -87,6 +87,9 @@ model Product {
   // - Integers are always exact; the UI divides by 100 to display: 999 / 100 = "$9.99"
   priceInCents Int
 
+  // null = not on sale; when set must be strictly less than priceInCents
+  salePriceInCents Int?
+
   stockQty  Int      @default(0)
   imageUrl  String
   previewUrl String

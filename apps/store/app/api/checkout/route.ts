@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@repo/db/client";
+import { getEffectivePriceInCents } from "@repo/db/pricing";
 import { requireUser } from "@/lib/auth-helper";
 
 export async function POST() {
@@ -17,7 +18,7 @@ export async function POST() {
   }
 
   const totalCents = cartItems.reduce(
-    (sum, ci) => sum + ci.product.priceInCents * ci.quantity,
+    (sum, ci) => sum + getEffectivePriceInCents(ci.product) * ci.quantity,
     0
   );
 
@@ -42,7 +43,7 @@ export async function POST() {
             create: cartItems.map((ci) => ({
               productId:      ci.productId,
               quantity:       ci.quantity,
-              unitPriceCents: ci.product.priceInCents,
+              unitPriceCents: getEffectivePriceInCents(ci.product),
             })),
           },
         },

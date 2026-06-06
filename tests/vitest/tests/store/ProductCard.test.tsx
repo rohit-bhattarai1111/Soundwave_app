@@ -53,6 +53,7 @@ const mockProduct: Product = {
   artist: "The Static Kings",
   genre: "ROCK",
   priceInCents: 999,
+  salePriceInCents: null,
   imageUrl: "https://picsum.photos/seed/1/400/400",
   previewUrl: "/preview-placeholder.mp3",
 };
@@ -92,6 +93,18 @@ describe("ProductCard", () => {
     const expensiveProduct: Product = { ...mockProduct, priceInCents: 1299 };
     render(<ProductCard product={expensiveProduct} />);
     expect(screen.getByText("$12.99")).toBeInTheDocument();
+  });
+
+  it("shows sale badge, strikethrough list price, and sale price when on sale", () => {
+    const saleProduct: Product = {
+      ...mockProduct,
+      priceInCents: 999,
+      salePriceInCents: 699,
+    };
+    render(<ProductCard product={saleProduct} />);
+    expect(screen.getByText("Sale")).toBeInTheDocument();
+    expect(screen.getByText("$9.99")).toHaveClass("line-through");
+    expect(screen.getByText("$6.99")).toBeInTheDocument();
   });
 
 });

@@ -1,19 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { z } from "zod";
 import { db } from "@repo/db/client";
 import { requireAdmin } from "@/lib/api-auth";
 import { DB_TO_UI_GENRE, UI_TO_DB_GENRE } from "@/lib/genre";
+import { ProductBodySchema, salePriceToCents, centsToSalePrice } from "@/lib/product-schema";
 import type { Genre } from "@/lib/mock-data";
-
-const ProductUpdateSchema = z.object({
-  title:      z.string().min(1, "Title is required."),
-  artist:     z.string().min(1, "Artist is required."),
-  genre:      z.enum(["Rock", "Jazz", "Hip-Hop", "Electronic"] as const),
-  price:      z.number().positive("Price must be greater than 0."),
-  stock:      z.number().int().min(0, "Stock cannot be negative."),
-  imageUrl:   z.string().url().or(z.literal("")),
-  previewUrl: z.string().default("/preview-placeholder.mp3"),
-});
 
 export async function PUT(
   req: NextRequest,
@@ -29,7 +19,7 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const result = ProductUpdateSchema.safeParse(body);
+  const result = ProductBodySchema.safeParse(body);
   if (!result.success) {
     return NextResponse.json(
       { error: "Validation failed.", details: result.error.flatten().fieldErrors },
@@ -37,7 +27,7 @@ export async function PUT(
     );
   }
 
-  const { title, artist, genre, price, stock, imageUrl, previewUrl } = result.data;
+  const { title, artist, genre, price, salePrice, stock, imageUrl, previewUrl } = result.data;
 
   try {
     const updated = await db.product.update({
@@ -45,10 +35,11 @@ export async function PUT(
       data: {
         title,
         artist,
-        genre:        UI_TO_DB_GENRE[genre],
-        priceInCents: Math.round(price * 100),
-        stockQty:     stock,
-        imageUrl:     imageUrl || `https://picsum.photos/seed/${encodeURIComponent(title)}/400/400`,
+        genre:            UI_TO_DB_GENRE[genre],
+        priceInCents:     Math.round(price * 100),
+        salePriceInCents: salePriceToCents(salePrice),
+        stockQty:         stock,
+        imageUrl:         imageUrl || `https://picsum.photos/seed/${encodeURIComponent(title)}/400/400`,
         previewUrl,
       },
     });
@@ -59,6 +50,7 @@ export async function PUT(
       artist:     updated.artist,
       genre:      (DB_TO_UI_GENRE[updated.genre] ?? "Rock") as Genre,
       price:      updated.priceInCents / 100,
+      salePrice:  centsToSalePrice(updated.salePriceInCents),
       stock:      updated.stockQty,
       imageUrl:   updated.imageUrl,
       previewUrl: updated.previewUrl,

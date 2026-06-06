@@ -5,6 +5,7 @@ export interface ProductSeed {
   artist: string;
   genre: DbGenre;
   priceInCents: number;
+  salePriceInCents?: number | null;
   stockQty: number;
   imageUrl: string;
   previewUrl: string;
@@ -39,6 +40,7 @@ export const seedData: {
       artist: "The Static Kings",
       genre: "ROCK",
       priceInCents: 999,
+      salePriceInCents: 699,
       stockQty: 100,
       imageUrl: "https://picsum.photos/seed/1/400/400",
       previewUrl: "/preview-placeholder.mp3",
@@ -111,6 +113,7 @@ export const seedData: {
       artist: "The Hollow Ground",
       genre: "ROCK",
       priceInCents: 799,
+      salePriceInCents: 599,
       stockQty: 100,
       imageUrl: "https://picsum.photos/seed/9/400/400",
       previewUrl: "/preview-placeholder.mp3",

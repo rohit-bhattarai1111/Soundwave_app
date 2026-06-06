@@ -1,11 +1,12 @@
 export interface Product {
-  id:           string;
-  title:        string;
-  artist:       string;
-  genre:        string;
-  priceInCents: number;
-  imageUrl:     string;
-  previewUrl:   string;
+  id:               string;
+  title:            string;
+  artist:           string;
+  genre:            string;
+  priceInCents:     number;
+  salePriceInCents: number | null;
+  imageUrl:         string;
+  previewUrl:       string;
 }
 
 export const GENRE_DISPLAY: Record<string, string> = {

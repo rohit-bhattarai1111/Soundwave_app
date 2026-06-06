@@ -43,7 +43,9 @@ async function seed() {
           artist: product.artist,
         },
       },
-      update: {},
+      update: {
+        salePriceInCents: product.salePriceInCents ?? null,
+      },
       create: product,
     });
     console.log(`  ✅ ${product.title} — ${product.artist} ($${(product.priceInCents / 100).toFixed(2)})`);

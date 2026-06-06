@@ -26,6 +26,7 @@ async function seedE2E() {
       artist: "Miles Davis",
       genre: "JAZZ",
       priceInCents: 999,
+      salePriceInCents: 799,
       stockQty: 50,
       imageUrl:   "https://picsum.photos/seed/e1/400/400",
       previewUrl: "/preview-placeholder.mp3",
@@ -44,6 +45,7 @@ async function seedE2E() {
       artist: "The Static Kings",
       genre: "ROCK",
       priceInCents: 899,
+      salePriceInCents: 699,
       stockQty: 50,
       imageUrl:   "https://picsum.photos/seed/e3/400/400",
       previewUrl: "/preview-placeholder.mp3",
@@ -71,7 +73,7 @@ async function seedE2E() {
   for (const p of products) {
     await db.product.upsert({
       where:  { title_artist: { title: p.title, artist: p.artist } },
-      update: { stockQty: p.stockQty },
+      update: { stockQty: p.stockQty, salePriceInCents: p.salePriceInCents ?? null },
       create: p,
     });
     console.log(`  ✅ ${p.title} — ${p.artist}`);

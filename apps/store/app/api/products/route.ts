@@ -6,6 +6,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? "";
   const genre  = searchParams.get("genre")  ?? "";
+  const onSale = searchParams.get("sale") === "1";
 
   try {
     const products = await db.product.findMany({
@@ -19,16 +20,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             }
           : {}),
         ...(genre && genre !== "all" ? { genre } : {}),
+        ...(onSale ? { salePriceInCents: { not: null } } : {}),
       },
       orderBy: { createdAt: "desc" },
       select: {
-        id:           true,
-        title:        true,
-        artist:       true,
-        genre:        true,
-        priceInCents: true,
-        imageUrl:     true,
-        previewUrl:   true,
+        id:               true,
+        title:            true,
+        artist:           true,
+        genre:            true,
+        priceInCents:     true,
+        salePriceInCents: true,
+        imageUrl:         true,
+        previewUrl:       true,
       },
     });
 
