@@ -3,7 +3,7 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "^db:generate"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**"],
       "env": ["DATABASE_URL", "AUTH_SECRET", "AUTH_URL", "AUTH_COOKIE_NAME", "AUTH_TRUST_HOST"]
@@ -24,6 +24,9 @@
     "start:e2e": {
       "cache": false,
       "persistent": true
+    },
+    "db:generate": {
+      "cache": false
     }
   }
 }

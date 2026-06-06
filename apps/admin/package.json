@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "start:e2e": "node ../../scripts/dev-test-server.mjs admin 3003 admin.session-token",
-    "build": "next build",
+    "build": "pnpm --filter @repo/db exec prisma generate && next build",
     "start": "next start --port 3001",
     "lint": "eslint --max-warnings 0",
     "check-types": "tsc --noEmit"
