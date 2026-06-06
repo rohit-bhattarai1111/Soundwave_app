@@ -1,0 +1,186 @@
+// Prisma Schema — the single source of truth for the database structure.
+// Prisma reads this file and generates:
+//   1. A type-safe TypeScript client (import { db } from '@repo/db/client')
+//   2. SQL migration files (packages/db/prisma/migrations/)
+
+generator client {
+  provider        = "prisma-client-js"
+  // previewFeatures = ["driverAdapters"] unlocks Prisma's "driver adapter" API,
+  // which lets us plug in @libsql/client (Turso's HTTP client) instead of
+  // Prisma's built-in SQLite file engine.  Without this flag the PrismaClient
+  // constructor rejects the { adapter: ... } option at runtime.
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  // SQLite stores the entire database in a single flat file — perfect for
+  // local development since no database server needs to be installed.
+  // For production (iteration 3+) this would switch to "postgresql".
+  provider = "sqlite"
+  // "file:./dev.db" resolves relative to the prisma/ folder,
+  // so the database file lands at packages/db/prisma/dev.db
+  url      = env("DATABASE_URL")
+}
+
+// ─── NOTE ON ENUMS ────────────────────────────────────────────────────────────
+// Prisma 5.x does NOT support enums with the SQLite provider — they are stored
+// as plain TEXT strings. We therefore declare all enum-like fields as String
+// and enforce the allowed values in application code (seed.ts, server actions).
+//
+// Allowed values (documented here as the source of truth):
+//   Role:        "USER" | "ADMIN"
+//   Genre:       "ROCK" | "JAZZ" | "HIP_HOP" | "ELECTRONIC"
+//   OrderStatus: "PENDING" | "PAID" | "CANCELLED"
+//
+// When we migrate to PostgreSQL (which has a native enum type), we can
+// convert these String fields back to proper Prisma enums without changing
+// any application code — because the stored values are identical.
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  // @id marks this as the primary key.
+  // @default(cuid()) auto-generates a collision-resistant unique string ID.
+  id        String   @id @default(cuid())
+
+  // @unique means no two users can share the same email address.
+  email     String   @unique
+
+  // Stored as a bcrypt hash — NEVER the plain-text password.
+  password  String
+
+  name      String
+
+  // Allowed values: "USER" (customer) | "ADMIN" (store staff).
+  // @default("USER") means new signups are regular customers unless set otherwise.
+  role      String   @default("USER")
+
+  createdAt DateTime @default(now())
+
+  // ── Relations ──────────────────────────────────────────────────────────
+  // These fields don't create database columns — they tell Prisma how to
+  // JOIN tables when you call db.user.findUnique({ include: { cartItems: true } }).
+  cartItems CartItem[]
+  orders    Order[]
+
+  // NextAuth.js requires these two relations for its session management.
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Product {
+  id    String @id @default(cuid())
+  title  String
+  artist String
+
+  // Allowed values: "ROCK" | "JAZZ" | "HIP_HOP" | "ELECTRONIC"
+  genre  String
+
+  // We store price as INTEGER CENTS (e.g. $9.99 → 999) because:
+  // - SQLite has no Decimal type
+  // - Floating-point arithmetic is imprecise for money
+  //   ($9.99 + $3.00 might compute as $12.989999... with a Float)
+  // - Integers are always exact; the UI divides by 100 to display: 999 / 100 = "$9.99"
+  priceInCents Int
+
+  stockQty  Int      @default(0)
+  imageUrl  String
+  previewUrl String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  // Compound unique index: same artist can't release two albums with the same title.
+  // This also lets the seed script safely use upsert() by the title+artist pair.
+  @@unique([title, artist])
+}
+
+model CartItem {
+  // No separate @id — the compound @@unique below acts as the natural key.
+  userId    String
+  productId String
+  quantity  Int    @default(1)
+
+  // onDelete: Cascade — if the User row is deleted, all their CartItems
+  // are automatically deleted too (no orphaned rows).
+  user    User    @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  // A user can only have one CartItem row per product — they increase quantity instead.
+  @@unique([userId, productId])
+}
+
+model Order {
+  id     String @id @default(cuid())
+  userId String
+
+  totalCents Int
+
+  // Allowed values: "PENDING" | "PAID" | "CANCELLED"
+  status String @default("PENDING")
+
+  // The ? makes this field optional (NULL in the database).
+  // Filled in by the Stripe webhook after payment is confirmed.
+  stripePaymentIntentId String?
+
+  createdAt DateTime @default(now())
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+
+  // Snapshot of the price at the moment of purchase — crucial because the
+  // product's priceInCents might change later but the order history must stay accurate.
+  unitPriceCents Int
+
+  order   Order   @relation(fields: [orderId],   references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+// ─── NextAuth.js Models ───────────────────────────────────────────────────────
+// These three models are required by NextAuth's Prisma adapter.
+// We never write to them manually — NextAuth handles them when users log in.
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String   // e.g. "google", "github", "credentials"
+  providerAccountId String   // the user's ID on that provider's system
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique  // The token stored in the user's browser cookie.
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String   // Usually the user's email address.
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

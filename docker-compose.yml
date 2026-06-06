@@ -1,0 +1,73 @@
+version: "3.8"
+
+# docker-compose.yml — services used by the Soundwave monorepo.
+#
+# WHY THIS FILE EXISTS:
+#   Iteration 3 will migrate the database from SQLite (dev-only) to MySQL
+#   (production-grade). This file defines a mysql_test service so you can
+#   start a real MySQL server locally without installing MySQL globally.
+#
+# CURRENT USAGE (Iteration 2):
+#   E2E tests (tests/playwright/) still use SQLite (test.db), so you do NOT
+#   need to start this container for tests to pass right now.
+#   Run it when you are ready to prototype the MySQL migration.
+#
+# HOW TO START:
+#   docker compose up -d mysql_test
+#
+# HOW TO STOP:
+#   docker compose down
+#
+# IMPORTANT: docker-compose.yml is NOT gitignored — it is safe to commit.
+# Never put secrets (passwords, API keys) in committed files.
+# The password below is for the LOCAL TEST environment only.
+
+services:
+  # ── mysql_test ────────────────────────────────────────────────────────────────
+  # A MySQL 8.0 server that listens on port 3307 (not 3306) so it doesn't
+  # conflict with a MySQL server you might already have running locally.
+  #
+  # To connect:
+  #   mysql -h 127.0.0.1 -P 3307 -u root -p  (password: testpassword)
+  #
+  # Prisma connection string (add to .env.local when migrating):
+  #   DATABASE_URL="mysql://root:testpassword@localhost:3307/soundwave_test"
+  mysql_test:
+    image: mysql:8.0
+    container_name: soundwave_mysql_test
+
+    environment:
+      # Root password for the MySQL server (test environment only).
+      MYSQL_ROOT_PASSWORD: testpassword
+      # Database created automatically when the container first starts.
+      MYSQL_DATABASE: soundwave_test
+      # Default character set — utf8mb4 supports emojis and all Unicode chars.
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+
+    ports:
+      # Map host port 3307 → container port 3306 (MySQL default).
+      # Using 3307 avoids conflicts with any existing local MySQL installation.
+      - "3307:3306"
+
+    # Volume keeps database data between docker compose down / up cycles.
+    # Without this, the database would be empty every time the container restarts.
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+
+    # Restart policy: restart unless explicitly stopped.
+    # This means the container starts automatically when Docker Desktop opens.
+    restart: unless-stopped
+
+    # Health check — docker ps shows "healthy" once MySQL is accepting connections.
+    # Prisma migrate commands should wait for healthy status before running.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=testpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+# Named volume so data survives container restarts.
+volumes:
+  mysql_test_data:

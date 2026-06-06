@@ -1,0 +1,96 @@
+# playwright.yml — CI workflow for Playwright E2E tests.
+#
+# Must live at .github/workflows/ (repo root) for GitHub Actions to pick it up.
+# The tests themselves live in tests/playwright/ — this file just orchestrates them.
+#
+# TRIGGER: runs on every push to main and on every pull request targeting main.
+#          Runs in parallel with ci.yml (Build & Lint).
+#
+# WHAT IT DOES:
+#   1. Installs Node.js + pnpm
+#   2. Installs workspace dependencies
+#   3. Generates Prisma Client (required before the store/admin servers start)
+#   4. Installs the Chromium browser binary used by Playwright
+#   5. Runs `playwright test` — the config starts both Next.js dev servers automatically
+#
+# SECRETS REQUIRED (GitHub → Settings → Secrets → Actions):
+#   STRIPE_SECRET_KEY                  — Stripe test secret key (sk_test_...)
+#   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY — Stripe test publishable key (pk_test_...)
+#   STRIPE_WEBHOOK_SECRET              — Stripe webhook signing secret (whsec_...)
+#
+# The Stripe secrets are optional — without them, checkout.spec.ts skips the
+# Stripe payment form (the page shows a "Stripe not configured" warning instead).
+
+name: Playwright E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  playwright:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. pnpm (must come before setup-node so the cache key is recognised) ─
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4   # matches packageManager in root package.json
+
+      # ── 3. Node.js (cache: 'pnpm' uses the pnpm content-addressable store) ──
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      # ── 4. Install workspace dependencies ────────────────────────────────────
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── 5. Generate Prisma Client ────────────────────────────────────────────
+      # The store and admin apps import from @repo/db/client — Prisma must be
+      # generated before the Next.js dev servers start inside playwright test.
+      - name: Generate Prisma Client
+        run: pnpm --filter @repo/db exec prisma generate
+
+      # ── 6. Install Playwright Chromium ───────────────────────────────────────
+      # --with-deps also installs OS-level browser dependencies on Ubuntu
+      # (libglib2, libnss3, etc.) that aren't pre-installed on the GitHub runner.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @soundwave/tests-playwright exec playwright install chromium --with-deps
+
+      # ── 7. Run E2E tests ─────────────────────────────────────────────────────
+      # playwright.config.ts starts both Next.js dev servers (store + admin)
+      # automatically via webServer[]. The test DB is reset by global-setup.ts
+      # before any spec runs. All paths in the config are relative to the
+      # monorepo root so they resolve correctly from here.
+      - name: Run Playwright E2E tests
+        run: pnpm --filter @soundwave/tests-playwright test
+        env:
+          CI: "true"
+          # Stripe keys — set these in GitHub → Settings → Secrets → Actions.
+          # The playwright config forwards them to both Next.js dev servers.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+      # ── 8. Upload Playwright report ──────────────────────────────────────────
+      # Uploads the HTML report even on failure so you can inspect screenshots
+      # and traces. Available for 14 days under Actions → your run → Artifacts.
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/playwright/playwright-report/
+          retention-days: 14
