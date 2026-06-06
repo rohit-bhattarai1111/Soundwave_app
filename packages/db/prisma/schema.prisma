@@ -113,7 +113,7 @@ model CartItem {
   // onDelete: Cascade — if the User row is deleted, all their CartItems
   // are automatically deleted too (no orphaned rows).
   user    User    @relation(fields: [userId],    references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 
   // A user can only have one CartItem row per product — they increase quantity instead.
   @@unique([userId, productId])
@@ -141,19 +141,15 @@ model Order {
 model OrderItem {
   id        String @id @default(cuid())
   orderId   String
-  productId String?
-
-  // Snapshots at purchase time — kept when the product is later deleted by an admin.
-  productTitle  String
-  productArtist String
-  quantity      Int
+  productId String
+  quantity  Int
 
   // Snapshot of the price at the moment of purchase — crucial because the
   // product's priceInCents might change later but the order history must stay accurate.
   unitPriceCents Int
 
-  order   Order    @relation(fields: [orderId],   references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order   Order   @relation(fields: [orderId],   references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 }
 
 // ─── NextAuth.js Models ───────────────────────────────────────────────────────

@@ -91,51 +91,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Product not found." }, { status: 404 });
     }
 
-    // #region agent log
-    fetch("http://127.0.0.1:7424/ingest/39d97a18-fdaa-4f42-a174-441cdd332d97", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "7380e9" },
-      body: JSON.stringify({
-        sessionId: "7380e9",
-        runId: "post-fix",
-        hypothesisId: "A-B",
-        location: "apps/admin/app/api/products/[id]/route.ts:DELETE",
-        message: "delete dependency counts",
-        data: {
-          productId: params.id,
-          cartItems: product._count.cartItems,
-          orderItems: product._count.orderItems,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     await db.$transaction([
       db.cartItem.deleteMany({ where: { productId: params.id } }),
       db.orderItem.deleteMany({ where: { productId: params.id } }),
       db.product.delete({ where: { id: params.id } }),
     ]);
-
-    // #region agent log
-    fetch("http://127.0.0.1:7424/ingest/39d97a18-fdaa-4f42-a174-441cdd332d97", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "7380e9" },
-      body: JSON.stringify({
-        sessionId: "7380e9",
-        runId: "post-fix",
-        hypothesisId: "A-B",
-        location: "apps/admin/app/api/products/[id]/route.ts:DELETE",
-        message: "product deleted",
-        data: {
-          productId: params.id,
-          removedCartItems: product._count.cartItems,
-          removedOrderItems: product._count.orderItems,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     return new NextResponse(null, { status: 204 });
 

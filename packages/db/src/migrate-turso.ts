@@ -44,14 +44,6 @@ async function applyMigrationSql(
     return;
   }
 
-  if (
-    migrationName.includes("order_item_product_snapshots") &&
-    (await columnExists(client, "OrderItem", "productTitle"))
-  ) {
-    console.log("    ↷ OrderItem product snapshots already exist — skipping");
-    return;
-  }
-
   const addColumnMatch = sql.match(
     /ALTER TABLE "(\w+)" ADD COLUMN "(\w+)" (\w+(?:\([^)]*\))?)/i
   );
