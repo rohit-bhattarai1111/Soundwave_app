@@ -9,9 +9,11 @@
 //           from the database AND clear the browser cookie.
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 
 export function NavbarAuthSection() {
+  const router = useRouter();
   // useSession() reads the session from SessionProvider (set up in providers.tsx).
   // `status` is: "loading" | "authenticated" | "unauthenticated"
   // During loading (brief hydration moment), we render nothing to avoid a flash.
@@ -43,7 +45,11 @@ export function NavbarAuthSection() {
             NextAuth deletes the Session row from the DB and clears the cookie.
             callbackUrl tells NextAuth where to redirect after sign-out. */}
         <button
-          onClick={() => signOut({ callbackUrl: "/" })}
+          onClick={async () => {
+            await signOut({ redirect: false });
+            router.push("/");
+            router.refresh();
+          }}
           className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:border-red-300 hover:text-red-500"
         >
           Logout

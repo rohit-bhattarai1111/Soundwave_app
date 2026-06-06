@@ -30,7 +30,7 @@ const MONOREPO_ROOT = path.resolve(__dirname, "../..");
 // starts from apps/store/ or apps/admin/.
 const TEST_DB_PATH = path.join(MONOREPO_ROOT, "packages", "db", "prisma", "test.db");
 
-// Forward slashes are required for the Prisma SQLite file URL on Windows.
+// Absolute file URL with forward slashes (Prisma on Windows rejects %20-encoded paths).
 const TEST_DATABASE_URL = `file:${TEST_DB_PATH.replace(/\\/g, "/")}`;
 
 // Auth cookie files — created by auth.setup.ts, read by web/admin projects.
@@ -133,7 +133,7 @@ export default defineConfig({
   webServer: [
     // ── Store test server (port 3002) ────────────────────────────────────────────
     {
-      command: "pnpm --filter store dev:test",
+      command: "pnpm --filter store start:e2e",
       url:     "http://localhost:3002",
       // Override DATABASE_URL so the store reads from test.db, not dev.db.
       // PORT overrides the Next.js listen port (alternative to --port flag).
@@ -151,14 +151,14 @@ export default defineConfig({
         AUTH_SECRET:      "e2e-test-secret-soundwave-32chars",
         AUTH_COOKIE_NAME: "store.session-token",
       },
-      // On CI, always start a fresh server. Locally, reuse if already running on
-      // the TEST port (3002) — safe because dev runs on 3000, not 3002.
-      reuseExistingServer: !process.env["CI"],
+      // Reuse servers started by `pnpm dev:test:servers` (store on 3002).
+      // If nothing is listening, Playwright starts its own with test.db env below.
+      reuseExistingServer: true,
     },
 
     // ── Admin test server (port 3003) ─────────────────────────────────────────────
     {
-      command: "pnpm --filter admin dev:test",
+      command: "pnpm --filter admin start:e2e",
       url:     "http://localhost:3003",
       env: {
         DATABASE_URL:     TEST_DATABASE_URL,
@@ -167,7 +167,7 @@ export default defineConfig({
         AUTH_SECRET:      "e2e-test-secret-soundwave-32chars",
         AUTH_COOKIE_NAME: "admin.session-token",
       },
-      reuseExistingServer: !process.env["CI"],
+      reuseExistingServer: true,
     },
   ],
 });

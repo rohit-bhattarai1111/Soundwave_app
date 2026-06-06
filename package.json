@@ -7,7 +7,9 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "dev:test": "turbo run dev:test",
+    "dev:test": "turbo run dev:test --filter=@soundwave/tests-vitest --filter=@soundwave/tests-playwright",
+    "dev:test:servers": "turbo run start:e2e --filter=store --filter=admin",
+    "kill:test-ports": "node scripts/kill-test-ports.mjs",
     "postinstall": "pnpm --filter @repo/db exec prisma generate"
   },
   "devDependencies": {

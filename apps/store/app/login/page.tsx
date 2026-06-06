@@ -73,12 +73,13 @@ export default function LoginPage() {
 
     setLoading(false);
 
-    if (result?.ok) {
-      router.push(callbackUrl);
-      router.refresh();
-    } else {
+    if (result?.error || !result?.ok) {
       setServerError("Invalid email or password.");
+      return;
     }
+
+    router.push(callbackUrl);
+    router.refresh();
   }
 
   return (

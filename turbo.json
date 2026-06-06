@@ -19,8 +19,11 @@
       "persistent": true
     },
     "dev:test": {
-      
       "cache": false
+    },
+    "start:e2e": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

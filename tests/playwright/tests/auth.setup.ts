@@ -51,18 +51,23 @@ setup("save user session", async ({ page }) => {
   // Using an absolute URL here because the setup project has no single baseURL
   // (it must talk to both store:3000 and admin:3001).
   await page.goto("http://localhost:3002/login");
+  await page.waitForLoadState("networkidle");
 
-  // getByLabel finds the <input> associated with a <label> by its text content.
-  // This mirrors how a screen reader (and a real user) finds form controls —
-  // more resilient than CSS selectors which break on class renames.
   await page.getByLabel("Email address").fill("user@test.com");
   await page.getByLabel("Password").fill("user123");
-  await page.getByRole("button", { name: "Log in" }).click();
 
-  // waitForURL pauses until the browser URL matches the pattern.
-  // A successful login redirects to "/" — we wait here before saving cookies
-  // so we don't capture a mid-redirect session state.
-  await page.waitForURL("http://localhost:3002/");
+  await Promise.all([
+    page.waitForResponse(
+      (resp) => resp.url().includes("/api/auth/callback/credentials"),
+      { timeout: 15_000 }
+    ),
+    page.getByRole("button", { name: "Log in" }).click(),
+  ]);
+
+  // Wait until the session cookie is live — the Logout button only renders once
+  // useSession() resolves as authenticated. Saving storageState before this
+  // produces a user.json missing store.session-token (all cart/checkout tests fail).
+  await page.getByRole("button", { name: "Logout" }).waitFor({ timeout: 15_000 });
 
   // Save cookies + localStorage to a JSON file.
   // Playwright will inject these into the browser context for any test that
@@ -84,8 +89,9 @@ setup("save admin session", async ({ page }) => {
   // Admin app uses "Sign in" (not "Log in") — getByRole finds it by accessible name.
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  // Admin login redirects to /products on success.
+  // Admin login redirects to /products on success — wait for an authenticated UI signal.
   await page.waitForURL("http://localhost:3003/products");
+  await page.getByRole("button", { name: "Add Product" }).waitFor({ timeout: 15_000 });
 
   await page.context().storageState({
     path: path.join(AUTH_DIR, "admin.json"),
