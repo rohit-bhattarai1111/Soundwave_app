@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CartIcon } from "@/components/CartIcon";
+import { NavbarNavLinks } from "@/components/NavbarNavLinks";
 import { NavbarAuthSection } from "@/components/NavbarAuthSection";
 
 export function Navbar() {
@@ -12,15 +12,7 @@ export function Navbar() {
             Soundwave
           </Link>
 
-          <div className="hidden items-center gap-6 sm:flex">
-            <a
-              href="#"
-              className="text-sm font-medium text-gray-600 transition-colors hover:text-indigo-600"
-            >
-              Browse
-            </a>
-            <CartIcon />
-          </div>
+          <NavbarNavLinks />
 
           <NavbarAuthSection />
 

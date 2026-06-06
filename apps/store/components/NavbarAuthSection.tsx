@@ -16,6 +16,13 @@ export function NavbarAuthSection() {
     return (
       <div className="flex items-center gap-3">
 
+        <Link
+          href="/orders"
+          className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100 sm:hidden"
+        >
+          My Orders
+        </Link>
+
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
           {initial}
         </div>
